@@ -18,6 +18,8 @@ This repository includes a deploy flow matching your existing model:
 - `docker/docker-compose.yml`
 - `docker/docker-compose.staging.yml`
 - `docker/docker-compose.prod.yml`
+- `docker/worker.Dockerfile`
+- `docker/requirements.worker.txt`
 
 ## 1) Configure Git Remotes Locally
 
@@ -130,3 +132,4 @@ git deploy-prod
 - Hooks support either `/usr/local/bin/docker-compose` or `docker compose`.
 - Hook exits with non-zero status if new revision fails health checks (after attempted rollback).
 - The production push script only promotes `origin/dev` to `origin/main` if fast-forward is possible.
+- Worker now builds from `docker/worker.Dockerfile` (no runtime `pip install` in container startup).

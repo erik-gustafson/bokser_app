@@ -11,5 +11,4 @@ services:
     environment:
       APP_ENV: prod
     volumes:
-      - ../src:/app/src:ro
       - ${LAKE_HOST_PATH_PROD:-/volume1/data_lake/prod}:${LAKE_ROOT:-/data_lake}

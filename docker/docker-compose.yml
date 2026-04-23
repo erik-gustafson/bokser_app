@@ -25,14 +25,12 @@ services:
     restart: unless-stopped
 
   worker:
-    image: ${WORKER_IMAGE:-python:3.12-slim}
+    build:
+      context: ..
+      dockerfile: docker/worker.Dockerfile
+    image: ${WORKER_IMAGE:-bokser_app_worker:latest}
     restart: unless-stopped
-    working_dir: /app
     environment:
       <<: *app-env
     volumes:
-      - ../src:/app/src:ro
       - ${LAKE_HOST_PATH_DEV:-C:/Users/erik/Code/data_lake/dev}:${LAKE_ROOT:-/data_lake}
-    command: >
-      sh -c "pip install --no-cache-dir apscheduler httpx pydantic pydantic-settings &&
-      python -m src.worker.worker"

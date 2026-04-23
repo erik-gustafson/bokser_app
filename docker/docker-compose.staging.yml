@@ -11,5 +11,4 @@ services:
     environment:
       APP_ENV: staging
     volumes:
-      - ../src:/app/src:ro
       - ${LAKE_HOST_PATH_STAGING:-/volume1/data_lake/staging}:${LAKE_ROOT:-/data_lake}
