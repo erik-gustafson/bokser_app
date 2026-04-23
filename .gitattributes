@@ -1,0 +1,6 @@
+scripts/git-deploy-staging text eol=lf
+scripts/git-deploy-prod text eol=lf
+scripts/bootstrap_nas.sh text eol=lf
+scripts/install_git_aliases.sh text eol=lf
+nas-hooks/post-receive.staging text eol=lf
+nas-hooks/post-receive.production text eol=lf

@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+TMP_WORKTREE=""
+
+cleanup() {
+  if [[ -n "$TMP_WORKTREE" && -d "$TMP_WORKTREE" ]]; then
+    git -C "$ROOT_DIR" worktree remove --force "$TMP_WORKTREE" >/dev/null 2>&1 || true
+    rm -rf "$TMP_WORKTREE" || true
+  fi
+}
+trap cleanup EXIT
+
+require_remote() {
+  local name="$1"
+  if ! git remote get-url "$name" >/dev/null 2>&1; then
+    echo "Remote '$name' is not configured." >&2
+    exit 1
+  fi
+}
+
+require_remote origin
+require_remote production
+
+git fetch origin main dev
+
+MAIN_SHA="$(git rev-parse --verify refs/remotes/origin/main^{commit})"
+DEV_SHA="$(git rev-parse --verify refs/remotes/origin/dev^{commit})"
+
+echo "Promoting origin/dev (${DEV_SHA}) onto origin/main (${MAIN_SHA}) via fast-forward only."
+TMP_WORKTREE="$ROOT_DIR/.tmp/deploy-prod-worktree-$$"
+mkdir -p "$ROOT_DIR/.tmp"
+git -C "$ROOT_DIR" worktree add --detach "$TMP_WORKTREE" "$MAIN_SHA" >/dev/null
+
+if ! git -C "$TMP_WORKTREE" merge --ff-only "$DEV_SHA" >/dev/null; then
+  echo "Cannot fast-forward main to dev. Resolve divergence first." >&2
+  exit 1
+fi
+
+PROMOTED_SHA="$(git -C "$TMP_WORKTREE" rev-parse HEAD)"
+echo "Promoted SHA: $PROMOTED_SHA"
+
+git push origin "${PROMOTED_SHA}:refs/heads/main"
+git push production "${PROMOTED_SHA}:refs/heads/main"
+echo "Production deploy push complete."
+
