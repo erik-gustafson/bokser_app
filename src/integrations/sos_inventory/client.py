@@ -8,8 +8,8 @@ from typing import Any
 
 import httpx
 
-from src.bokser_app.core.config import settings
-from src.bokser_app.integrations.sos_inventory.auth import (
+from src.core.config import settings
+from src.integrations.sos_inventory.auth import (
     PROVIDER_SOS,
     get_valid_token_async,
 )

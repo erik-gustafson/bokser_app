@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.bokser_app.core.config import settings
+from src.core.config import settings
 
 PROVIDER_SOS = "sos_inventory"
 

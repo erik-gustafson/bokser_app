@@ -8,10 +8,10 @@ from contextlib import suppress
 import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from src.bokser_app.core.config import settings
-from src.bokser_app.integrations.sos_inventory.client import SOSInventoryClient
-from src.bokser_app.storage.raw.writer import RawPayloadWriter
-from src.bokser_app.worker.jobs.get_data.sos_data import sync_sos_orders_job
+from src.core.config import settings
+from src.integrations.sos_inventory.client import SOSInventoryClient
+from src.storage.raw.writer import RawPayloadWriter
+from src.worker.jobs.get_data.sos_data import sync_sos_orders_job
 
 
 def configure_logging() -> None:

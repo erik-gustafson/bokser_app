@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.bokser_app.integrations.sos_inventory.client import SOSInventoryClient
-from src.bokser_app.storage.raw.writer import RawPayloadWriter
+from src.integrations.sos_inventory.client import SOSInventoryClient
+from src.storage.raw.writer import RawPayloadWriter
 
 logger = logging.getLogger(__name__)
 
