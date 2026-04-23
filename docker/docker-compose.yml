@@ -1,0 +1,38 @@
+name: bokser_app
+
+x-app-env: &app-env
+  APP_ENV: ${APP_ENV:-dev}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  LAKE_ROOT: ${LAKE_ROOT:-/lake}
+  SOS_API_URL: ${SOS_API_URL:-https://api.example.com}
+  SOS_STATIC_TOKEN: ${SOS_STATIC_TOKEN:-dev-token}
+  SOS_AUTH_HEADER_NAME: ${SOS_AUTH_HEADER_NAME:-Authorization}
+  SOS_AUTH_HEADER_PREFIX: ${SOS_AUTH_HEADER_PREFIX:-Bearer}
+  SOS_POLL_INTERVAL_MINUTES: ${SOS_POLL_INTERVAL_MINUTES:-5}
+  HTTP_TIMEOUT_SECONDS: ${HTTP_TIMEOUT_SECONDS:-30}
+  HTTP_MAX_CONNECTIONS: ${HTTP_MAX_CONNECTIONS:-20}
+  HTTP_MAX_KEEPALIVE_CONNECTIONS: ${HTTP_MAX_KEEPALIVE_CONNECTIONS:-10}
+  HTTP_KEEPALIVE_EXPIRY_SECONDS: ${HTTP_KEEPALIVE_EXPIRY_SECONDS:-120}
+
+services:
+  # Placeholder HTTP service so deploy hooks can probe /health/status.
+  # Replace this with your real API image/build when available.
+  api:
+    image: ${API_IMAGE:-hashicorp/http-echo:1.0.0}
+    command:
+      - -listen=:8000
+      - -text={"status":"ok"}
+    restart: unless-stopped
+
+  worker:
+    image: ${WORKER_IMAGE:-python:3.12-slim}
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      <<: *app-env
+    volumes:
+      - ../src:/app/src:ro
+      - ${LAKE_HOST_PATH:-../data/lake}:${LAKE_ROOT:-/lake}
+    command: >
+      sh -c "pip install --no-cache-dir apscheduler httpx pydantic pydantic-settings &&
+      python -m src.worker.worker"

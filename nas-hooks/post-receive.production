@@ -5,8 +5,9 @@ IFS=$'\n\t'
 APP_DIR="/volume1/docker/bokser_app"
 LOG="/var/log/git-deploy-prod.log"
 BRANCH_EXPECTED="main"
-BASE_COMPOSE="docker-compose.yml"
-ENV_COMPOSE="docker-compose.prod.yml"
+BASE_COMPOSE="docker/docker-compose.yml"
+ENV_COMPOSE="docker/docker-compose.prod.yml"
+ENV_FILE="docker/.env"
 HEALTH_URL="http://127.0.0.1:8010/health/status"
 HEALTH_RETRIES=30
 HEALTH_SLEEP=2
@@ -60,8 +61,8 @@ done
   echo "ERROR: APP_DIR '$APP_DIR' not found" | tee -a "$LOG"
   exit 1
 }
-[ -f "$APP_DIR/.env" ] || {
-  echo "ERROR: Missing $APP_DIR/.env" | tee -a "$LOG"
+[ -f "$APP_DIR/$ENV_FILE" ] || {
+  echo "ERROR: Missing $APP_DIR/$ENV_FILE" | tee -a "$LOG"
   exit 1
 }
 [ -f "$APP_DIR/$BASE_COMPOSE" ] && [ -f "$APP_DIR/$ENV_COMPOSE" ] || {
@@ -92,16 +93,16 @@ health_check() {
 deploy_current() {
   cd "$APP_DIR"
   echo "Prod: down..." | tee -a "$LOG"
-  run_compose -f "$BASE_COMPOSE" -f "$ENV_COMPOSE" down 2>&1 | tee -a "$LOG" || true
+  run_compose --env-file "$ENV_FILE" -f "$BASE_COMPOSE" -f "$ENV_COMPOSE" down 2>&1 | tee -a "$LOG" || true
   echo "Prod: build..." | tee -a "$LOG"
-  run_compose -f "$BASE_COMPOSE" -f "$ENV_COMPOSE" build 2>&1 | tee -a "$LOG"
+  run_compose --env-file "$ENV_FILE" -f "$BASE_COMPOSE" -f "$ENV_COMPOSE" build 2>&1 | tee -a "$LOG"
   echo "Prod: up..." | tee -a "$LOG"
-  run_compose -f "$BASE_COMPOSE" -f "$ENV_COMPOSE" up -d 2>&1 | tee -a "$LOG"
+  run_compose --env-file "$ENV_FILE" -f "$BASE_COMPOSE" -f "$ENV_COMPOSE" up -d 2>&1 | tee -a "$LOG"
 }
 
 log_diagnostics() {
-  run_compose -f "$BASE_COMPOSE" -f "$ENV_COMPOSE" ps 2>&1 | tee -a "$LOG" || true
-  run_compose -f "$BASE_COMPOSE" -f "$ENV_COMPOSE" logs --tail 200 "${LOG_SERVICES[@]}" 2>&1 | tee -a "$LOG" || true
+  run_compose --env-file "$ENV_FILE" -f "$BASE_COMPOSE" -f "$ENV_COMPOSE" ps 2>&1 | tee -a "$LOG" || true
+  run_compose --env-file "$ENV_FILE" -f "$BASE_COMPOSE" -f "$ENV_COMPOSE" logs --tail 200 "${LOG_SERVICES[@]}" 2>&1 | tee -a "$LOG" || true
 }
 
 rollback_to_old() {

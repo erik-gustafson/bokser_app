@@ -14,6 +14,10 @@ This repository includes a deploy flow matching your existing model:
 - `scripts/install_git_aliases.sh`
 - `nas-hooks/post-receive.staging`
 - `nas-hooks/post-receive.production`
+- `docker/.env`
+- `docker/docker-compose.yml`
+- `docker/docker-compose.staging.yml`
+- `docker/docker-compose.prod.yml`
 
 ## 1) Configure Git Remotes Locally
 
@@ -21,8 +25,8 @@ From this repo:
 
 ```bash
 git remote add origin <your-origin-url>
-git remote add staging bokser_admin@bokser_home_nas:/volume1/git/bokser_app-staging.git
-git remote add production bokser_admin@bokser_home_nas:/volume1/git/bokser_app-production.git
+git remote add staging bokser_admin@bokser_home_nas:~/git/bokser_app-staging.git
+git remote add production bokser_admin@bokser_home_nas:~/git/bokser_app-production.git
 ```
 
 ## 2) Bootstrap Bare Repos + Hooks on NAS
@@ -35,8 +39,8 @@ bash scripts/bootstrap_nas.sh
 
 This initializes:
 
-- `/volume1/git/bokser_app-staging.git`
-- `/volume1/git/bokser_app-production.git`
+- `~/git/bokser_app-staging.git`
+- `~/git/bokser_app-production.git`
 
 and installs hook templates into each bare repo.
 
@@ -52,7 +56,15 @@ Set these values for your NAS layout:
 - `APP_DIR`
   - staging default in this repo: `/volume1/Bokser_Home/Code/bokser_app`
   - production default in this repo: `/volume1/docker/bokser_app`
+- `ENV_FILE`
+  - default in this repo: `docker/.env`
 - `BASE_COMPOSE` and `ENV_COMPOSE`
+  - staging defaults in this repo:
+    - `docker/docker-compose.yml`
+    - `docker/docker-compose.staging.yml`
+  - production defaults in this repo:
+    - `docker/docker-compose.yml`
+    - `docker/docker-compose.prod.yml`
 - `HEALTH_URL`
   - staging default in this repo: `http://127.0.0.1:8011/health/status`
   - production default in this repo: `http://127.0.0.1:8010/health/status`
@@ -61,18 +73,18 @@ Set these values for your NAS layout:
 Then reinstall hooks if you changed templates:
 
 ```bash
-install -m 755 nas-hooks/post-receive.staging /volume1/git/bokser_app-staging.git/hooks/post-receive
-install -m 755 nas-hooks/post-receive.production /volume1/git/bokser_app-production.git/hooks/post-receive
+install -m 755 nas-hooks/post-receive.staging ~/git/bokser_app-staging.git/hooks/post-receive
+install -m 755 nas-hooks/post-receive.production ~/git/bokser_app-production.git/hooks/post-receive
 ```
 
 ## 4) Prepare App Directories on NAS
 
 Ensure each `APP_DIR` exists and contains:
 
-- `.env`
-- `docker-compose.yml`
-- `docker-compose.staging.yml` (staging only)
-- `docker-compose.prod.yml` (prod only)
+- `docker/.env`
+- `docker/docker-compose.yml`
+- `docker/docker-compose.staging.yml` (staging only)
+- `docker/docker-compose.prod.yml` (prod only)
 
 ## 5) Deploy Commands
 

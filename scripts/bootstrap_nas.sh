@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-STAGING_BARE="/volume1/git/bokser_app-staging.git"
-PROD_BARE="/volume1/git/bokser_app-production.git"
+STAGING_BARE="$HOME/git/bokser_app-staging.git"
+PROD_BARE="$HOME/git/bokser_app-production.git"
 
 install_bare_repo() {
   local repo_path="$1"
@@ -36,4 +36,3 @@ install_hook "$ROOT_DIR/nas-hooks/post-receive.staging" "$STAGING_BARE"
 install_hook "$ROOT_DIR/nas-hooks/post-receive.production" "$PROD_BARE"
 
 echo "NAS bootstrap complete."
-

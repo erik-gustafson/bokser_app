@@ -1,0 +1,13 @@
+services:
+  api:
+    container_name: bokser_app_api_staging
+    ports:
+      - ${STAGING_API_HOST_PORT:-8011}:8000
+    environment:
+      APP_ENV: staging
+
+  worker:
+    container_name: bokser_app_worker_staging
+    environment:
+      APP_ENV: staging
+
