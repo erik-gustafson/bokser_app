@@ -3,7 +3,7 @@ name: bokser_app
 x-app-env: &app-env
   APP_ENV: ${APP_ENV:-dev}
   LOG_LEVEL: ${LOG_LEVEL:-INFO}
-  LAKE_ROOT: ${LAKE_ROOT:-/lake}
+  LAKE_ROOT: ${LAKE_ROOT:-/data_lake}
   SOS_API_URL: ${SOS_API_URL:-https://api.example.com}
   SOS_STATIC_TOKEN: ${SOS_STATIC_TOKEN:-dev-token}
   SOS_AUTH_HEADER_NAME: ${SOS_AUTH_HEADER_NAME:-Authorization}
@@ -32,7 +32,7 @@ services:
       <<: *app-env
     volumes:
       - ../src:/app/src:ro
-      - ${LAKE_HOST_PATH:-../data/lake}:${LAKE_ROOT:-/lake}
+      - ${LAKE_HOST_PATH_DEV:-C:/Users/erik/Code/data_lake/dev}:${LAKE_ROOT:-/data_lake}
     command: >
       sh -c "pip install --no-cache-dir apscheduler httpx pydantic pydantic-settings &&
       python -m src.worker.worker"

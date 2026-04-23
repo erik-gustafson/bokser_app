@@ -69,6 +69,10 @@ Set these values for your NAS layout:
   - staging default in this repo: `http://127.0.0.1:8011/health/status`
   - production default in this repo: `http://127.0.0.1:8010/health/status`
 - `LOG_SERVICES` (Compose service names)
+- `LAKE_ROOT` / `LAKE_HOST_PATH_*` (in `docker/.env`)
+  - `LAKE_ROOT=/data_lake`
+  - `LAKE_HOST_PATH_STAGING=/volume1/data_lake/staging`
+  - `LAKE_HOST_PATH_PROD=/volume1/data_lake/prod`
 
 Then reinstall hooks if you changed templates:
 
@@ -85,6 +89,19 @@ Ensure each `APP_DIR` exists and contains:
 - `docker/docker-compose.yml`
 - `docker/docker-compose.staging.yml` (staging only)
 - `docker/docker-compose.prod.yml` (prod only)
+
+Create data lake directories:
+
+```bash
+mkdir -p /volume1/data_lake/staging
+mkdir -p /volume1/data_lake/prod
+```
+
+For local development on Windows, create:
+
+```powershell
+New-Item -ItemType Directory -Force C:\Users\erik\Code\data_lake\dev
+```
 
 ## 5) Deploy Commands
 

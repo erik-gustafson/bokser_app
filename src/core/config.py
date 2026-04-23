@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     app_env: str = "dev"
     log_level: str = "INFO"
 
-    lake_root: Path = Path("/lake")
+    lake_root: Path = Path("/data_lake")
 
     sos_api_url: str = "https://api.example.com"
     sos_static_token: str = Field(default="dev-token", repr=False)
