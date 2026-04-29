@@ -1,36 +1,62 @@
-name: bokser_app
-
-x-app-env: &app-env
-  APP_ENV: ${APP_ENV:-dev}
-  LOG_LEVEL: ${LOG_LEVEL:-INFO}
-  LAKE_ROOT: ${LAKE_ROOT:-/data_lake}
-  SOS_API_URL: ${SOS_API_URL:-https://api.example.com}
-  SOS_STATIC_TOKEN: ${SOS_STATIC_TOKEN:-dev-token}
-  SOS_AUTH_HEADER_NAME: ${SOS_AUTH_HEADER_NAME:-Authorization}
-  SOS_AUTH_HEADER_PREFIX: ${SOS_AUTH_HEADER_PREFIX:-Bearer}
-  SOS_POLL_INTERVAL_MINUTES: ${SOS_POLL_INTERVAL_MINUTES:-5}
-  HTTP_TIMEOUT_SECONDS: ${HTTP_TIMEOUT_SECONDS:-30}
-  HTTP_MAX_CONNECTIONS: ${HTTP_MAX_CONNECTIONS:-20}
-  HTTP_MAX_KEEPALIVE_CONNECTIONS: ${HTTP_MAX_KEEPALIVE_CONNECTIONS:-10}
-  HTTP_KEEPALIVE_EXPIRY_SECONDS: ${HTTP_KEEPALIVE_EXPIRY_SECONDS:-120}
+name: ${COMPOSE_PROJECT_NAME:-bokser_app}
 
 services:
-  # Placeholder HTTP service so deploy hooks can probe /health/status.
-  # Replace this with your real API image/build when available.
-  api:
-    image: ${API_IMAGE:-hashicorp/http-echo:1.0.0}
-    command:
-      - -listen=:8000
-      - -text={"status":"ok"}
-    restart: unless-stopped
-
-  worker:
+  migrate:
     build:
       context: ..
-      dockerfile: docker/worker.Dockerfile
-    image: ${WORKER_IMAGE:-bokser_app_worker:latest}
-    restart: unless-stopped
-    environment:
-      <<: *app-env
+      dockerfile: docker/Dockerfile
+    image: ${APP_IMAGE:-bokser_app:latest}
+    container_name: ${MIGRATE_CONTAINER_NAME:-bokser_app_migrate}
+    working_dir: /app
+    command: alembic -c /app/alembic.ini upgrade head
+    networks: [db_net]
+    restart: "no"
+    env_file:
+      - .env
     volumes:
-      - ${LAKE_HOST_PATH_DEV:-C:/Users/erik/Code/data_lake/dev}:${LAKE_ROOT:-/data_lake}
+      - ${LAKE_HOST_PATH}:${LAKE_ROOT}:rw
+      - ${LOGS_HOST_PATH}:${LOGS_ROOT}:rw
+
+  bokser_app_api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: ${APP_IMAGE:-bokser_app:latest}
+    container_name: ${API_CONTAINER_NAME:-bokser_app_api}
+    working_dir: /app
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - ${API_HOST_PORT:-8010}:8000
+    networks: [db_net]
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ${LAKE_HOST_PATH}:${LAKE_ROOT}:rw
+      - ${LOGS_HOST_PATH}:${LOGS_ROOT}:rw
+      - ${DOWNLOADS_HOST_PATH}:${DOWNLOADS_ROOT}:rw
+      - ${REPORTING_ARCHIVE_HOST_PATH}:${REPORTING_ARCHIVE_ROOT}:rw
+
+  bokser_app_worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: ${APP_IMAGE:-bokser_app:latest}
+    container_name: ${WORKER_CONTAINER_NAME:-bokser_app_worker}
+    working_dir: /app
+    command: python -m src.worker.worker
+    networks: [db_net]
+    restart: unless-stopped
+    stop_grace_period: 30s
+    env_file:
+      - .env
+    volumes:
+      - ${LAKE_HOST_PATH}:${LAKE_ROOT}:rw
+      - ${LOGS_HOST_PATH}:${LOGS_ROOT}:rw
+      - ${DOWNLOADS_HOST_PATH}:${DOWNLOADS_ROOT}:rw
+      - ${REPORTING_ARCHIVE_HOST_PATH}:${REPORTING_ARCHIVE_ROOT}:rw
+
+networks:
+  db_net:
+    external: ${DB_NET_EXTERNAL:-true}
+    name: ${DB_NET_NAME:-db_net}

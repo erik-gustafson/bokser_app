@@ -1,3 +1,10 @@
-.env
 .tmp/
+.env
+docker/.env
+.venv
+logs/
+downloads/
+data_lake/
+reporting_archive/
 
+*.log

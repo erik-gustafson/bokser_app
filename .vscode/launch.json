@@ -1,0 +1,51 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/docker/.env",
+      "justMyCode": true
+    },
+    {
+      "name": "Python: direct_runner.py",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/direct_runner.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/docker/.env",
+      "justMyCode": true
+    },
+    {
+      "name": "Python: worker.py",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/worker/worker.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/docker/.env",
+      "justMyCode": true
+    },
+    {
+    "name": "Docker: Attach to Worker",
+    "type": "debugpy",
+    "request": "attach",
+    "connect": {
+        "host": "localhost",
+        "port": 5679
+    },
+    "pathMappings": [
+        {
+        "localRoot": "${workspaceFolder}",
+        "remoteRoot": "/app"
+        }
+    ],
+    "justMyCode": true
+    }
+  ]
+}

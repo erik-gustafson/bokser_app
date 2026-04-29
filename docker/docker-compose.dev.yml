@@ -1,0 +1,23 @@
+name: bokser_app_dev
+
+services:
+  migrate:
+    volumes:
+      - ../:/app:rw
+
+  bokser_app_api:
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ../:/app:rw
+
+  bokser_app_worker:
+    command: python -m debugpy --listen 0.0.0.0:5679 --wait-for-client -m src.worker.worker
+    ports:
+      - 5679:5679
+    volumes:
+      - ../:/app:rw
+
+networks:
+  db_net:
+    external: false
+    name: ${DB_NET_NAME:-bokser_app_dev_db_net}

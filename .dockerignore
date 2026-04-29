@@ -2,10 +2,14 @@
 .gitignore
 .gitattributes
 
+.venv/
+.tmp/
 docker/.env
 data/
+logs/
+downloads/
+reporting_archive/
 **/__pycache__/
 **/*.pyc
 **/*.pyo
 **/*.pyd
-

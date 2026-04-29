@@ -1,23 +1,37 @@
-// {
-//   "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python",
-//   "python.testing.pytestEnabled": true,
-//   "python.testing.pytestArgs": ["tests"],
-//   "python.analysis.typeCheckingMode": "basic",
-//   "editor.formatOnSave": true,
-//   "editor.codeActionsOnSave": {
-//     "source.organizeImports": "explicit"
-//   },
-//   "python.formatting.provider": "black",
-//   "isort.args": ["--profile", "black"],
-//   "files.exclude": {
-//     "**/__pycache__": true,
-//     "**/*.pyc": true
-//   },
-//   "terminal.integrated.cwd": "${workspaceFolder}",
-//   "docker.dockerComposeBuild": true,
-//   "containers.composeBuild": true
-// }
 {
-    "python.terminal.useEnvFile": true,
-    "python.envFile": "${workspaceFolder}/docker/.env"
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "python.terminal.activateEnvironment": true,
+
+  "python.envFile": "${workspaceFolder}/docker/.env",
+  "python.terminal.useEnvFile": true,
+
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": ["tests"],
+
+  "python.analysis.typeCheckingMode": "basic",
+
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+
+  "black-formatter.interpreter": [
+    "${workspaceFolder}/.venv/Scripts/python.exe"
+  ],
+  "black-formatter.importStrategy": "useBundled",
+
+  "isort.args": ["--profile", "black"],
+
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true
+  },
+
+  "terminal.integrated.cwd": "${workspaceFolder}",
+
+  "docker.dockerComposeBuild": true,
+  "containers.composeBuild": true
 }

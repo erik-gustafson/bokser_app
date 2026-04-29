@@ -1,0 +1,11 @@
+alembic
+apscheduler
+asyncpg
+debugpy
+fastapi
+httpx
+psycopg[binary]
+pydantic
+pydantic-settings
+sqlalchemy
+uvicorn[standard]
