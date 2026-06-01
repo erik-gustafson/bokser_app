@@ -2,8 +2,10 @@
 
 import asyncio
 import logging
+import json
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator
+from pathlib import Path
 
 from src.core.config import settings
 from src.core.configs.acenda import AcendaEndpoint
@@ -34,6 +36,9 @@ class GetAcendaData:
         self.acenda_client = acenda_client or AcendaClient()
         self._owns_acenda_client = acenda_client is None
         self._open_depth = 0
+        self._acenda_state_file: Path = (
+            settings.lake_root / "raw" / "acenda" / "_state" / "acenda_query_state.json"
+        )
 
     async def open(self) -> None:
         self._open_depth += 1
@@ -69,9 +74,7 @@ class GetAcendaData:
         async def fetch_with_limit(endpoint: AcendaEndpoint) -> EndpointFetchResult:
             async with semaphore:
                 try:
-                    records = await self.get_raw_acenda_data(
-                        path=endpoint.path, max_concurrency=max_concurrency
-                    )
+                    records = await self.get_raw_acenda_data(endpoint, max_concurrency)
                     return EndpointFetchResult(endpoint=endpoint, records=records)
                 except Exception as exc:
                     logger.exception(
@@ -90,13 +93,19 @@ class GetAcendaData:
     async def _get_raw_acenda_data_with_open_client(
         self,
         *,
-        path: str,
+        endpoint: AcendaEndpoint,
         max_results: int,
         max_concurrency: int,
     ) -> list[dict[str, Any]]:
-        base_params = {}
+
+        watermark = settings.get_acenda_endpoint_watermark(
+            file_path=self._acenda_state_file, name=endpoint.name
+        )
+
+        endpoint_params = settings.get_acenda_endpoint_params(endpoint.name, watermark)
+        path = endpoint.path
         client = self.acenda_client
-        first = await client.get(path_or_url=path, params=base_params)
+        first = await client.get(path_or_url=path, params=endpoint_params)
         first.raise_for_status()
 
         data = first.json()
@@ -111,7 +120,7 @@ class GetAcendaData:
 
         async def fetch_page(page_idx: int) -> list[dict[str, Any]]:
             async with semaphore:
-                page_params = {**base_params, "page": page_idx}
+                page_params = {**endpoint_params, "page": page_idx}
 
                 response = await client.get(path_or_url=path, params=page_params)
                 response.raise_for_status()
@@ -136,7 +145,7 @@ class GetAcendaData:
 
     async def get_raw_acenda_data(
         self,
-        path: str,
+        endpoint: AcendaEndpoint,
         max_results: int = 100,
         max_concurrency: int = 5,
     ) -> list[dict[str, Any]]:
@@ -150,7 +159,7 @@ class GetAcendaData:
 
         try:
             return await self._get_raw_acenda_data_with_open_client(
-                path=path,
+                endpoint=endpoint,
                 max_results=max_results,
                 max_concurrency=max_concurrency,
             )
@@ -200,14 +209,17 @@ async def sync_acenda_endpoints_job(
 
             records = result.records
 
+            successful_endpoints += 1
+            total_records += len(records)
+
+            if not records:
+                continue
+
             write_result = raw_writer.write_json_payload(
                 source_system="acenda",
                 entity_name=endpoint.name,
                 payload=records,
             )
-
-            successful_endpoints += 1
-            total_records += write_result.record_count
 
             logger.info(
                 "Fetched and wrote Acenda endpoint=%s records=%s file=%s",
@@ -216,9 +228,26 @@ async def sync_acenda_endpoints_job(
                 write_result.file_path,
             )
 
+    if not failed_endpoints and records:
+        max_updated_at = max([x["updated_at"] for x in records])
+        update_watermark(
+            _state_file=acenda_data._acenda_state_file, watermark=max_updated_at
+        )
+
     logger.info(
         "Finished Acenda endpoint sync. successful_endpoints=%s failed_endpoints=%s total_records=%s",
         successful_endpoints,
         failed_endpoints,
         total_records,
     )
+
+
+def update_watermark(_state_file: Path, watermark: str | None):
+
+    with open(_state_file, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    data["all_orders"]["last_updated_date"] = watermark
+
+    with open(_state_file, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)

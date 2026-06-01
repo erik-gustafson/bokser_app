@@ -9,12 +9,14 @@ from src.worker.jobs.get_data.get_acenda_data import (
 )
 from src.worker.jobs.get_data.get_sos_data import GetSosData, sync_sos_endpoints_job
 
+LAKE_ROOT = settings.lake_root
+
 
 async def sos_main() -> None:
     await token_store.warmup_on_startup()
 
     sos_data = GetSosData()
-    raw_writer = RawPayloadWriter(lake_root=settings.lake_root)
+    raw_writer = RawPayloadWriter(LAKE_ROOT)
 
     await sync_sos_endpoints_job(
         sos_data=sos_data,
@@ -27,7 +29,7 @@ async def acenda_main() -> None:
     await token_store.warmup_on_startup()
 
     acenda_data = GetAcendaData()
-    raw_writer = RawPayloadWriter(lake_root=settings.lake_root)
+    raw_writer = RawPayloadWriter(LAKE_ROOT)
 
     await sync_acenda_endpoints_job(
         acenda_data=acenda_data,
