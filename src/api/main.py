@@ -1,8 +1,19 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
-app = FastAPI(title="BOKSER App API")
+from src.integrations._client_settings.token_cache import token_store
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    await token_store.warmup_on_startup()
+    yield
+
+
+app = FastAPI(title="BOKSER App API", lifespan=lifespan)
 
 
 @app.get("/health/status")

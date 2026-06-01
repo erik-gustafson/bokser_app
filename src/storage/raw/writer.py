@@ -42,7 +42,7 @@ class RawWriteResult:
     file_path: Path
     file_name: str
     metadata_path: Path | None
-    record_count: int | None
+    record_count: int
     file_size_bytes: int
     written_at_utc: datetime
     file_type: str
@@ -218,7 +218,7 @@ class RawPayloadWriter:
             file_path=file_path,
             file_name=file_name,
             metadata_path=metadata_path,
-            record_count=len(rows_list),
+            record_count=len(rows_list) if isinstance(rows_list, list) else 1,
             file_size_bytes=file_path.stat().st_size,
             written_at_utc=now,
             file_type=safe_file_type,
@@ -259,7 +259,7 @@ class RawPayloadWriter:
             source_system=safe_source_system,
             entity_name=safe_entity_name,
             file_type=safe_file_type,
-            record_count=None,
+            record_count=0,
             written_at_utc=now,
             metadata={
                 "original_file_name": original_file_name,
@@ -274,7 +274,7 @@ class RawPayloadWriter:
             file_path=file_path,
             file_name=file_name,
             metadata_path=metadata_path,
-            record_count=None,
+            record_count=0,
             file_size_bytes=file_path.stat().st_size,
             written_at_utc=now,
             file_type=safe_file_type,

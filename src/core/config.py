@@ -4,16 +4,12 @@ from pathlib import Path
 from functools import lru_cache
 
 from pydantic_settings import SettingsConfigDict
-from .configs import (
-    DatabaseSettings,
-    ENV_FILE,
-    HttpxSettings,
-    SosSettings,
-    ProductivSettings,
-)
+from .configs import *
 
 
-class Settings(DatabaseSettings, HttpxSettings, SosSettings, ProductivSettings):
+class Settings(
+    DatabaseSettings, HttpxSettings, SosSettings, ProductivSettings, AcendaSettings
+):
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
         env_file_encoding="utf-8",

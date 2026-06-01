@@ -10,19 +10,15 @@ import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from src.core.config import settings
-from src.integrations.sos_inventory.auth import set_token_http_client
-from src.integrations.sos_inventory.client import (
-    SOSInventoryClient,
-    build_sos_api_http_client,
-    build_sos_token_http_client,
-)
+from src.integrations._base_client.token_cache import token_store
+from src.integrations.sos_client import SOSClient
 from src.storage.raw.writer import RawPayloadWriter
-from src.worker.jobs.get_data.sos_data import sync_sos_orders_job
+from src.worker.jobs.get_data.get_sos_data import GetSosData, sync_sos_endpoints_job
 
 
 @dataclass(frozen=True)
 class WorkerRuntime:
-    sos_client: SOSInventoryClient
+    sos_data: GetSosData
     raw_writer: RawPayloadWriter
 
 
@@ -34,33 +30,30 @@ def configure_logging() -> None:
 
 
 def build_http_client() -> httpx.AsyncClient:
-    return build_sos_api_http_client()
-
-
-def build_token_http_client() -> httpx.AsyncClient:
-    return build_sos_token_http_client()
+    return httpx.AsyncClient(timeout=30.0)
 
 
 def build_runtime(http_client: httpx.AsyncClient) -> WorkerRuntime:
-    sos_client = SOSInventoryClient(
+    sos_client = SOSClient(
         client=http_client,
-        api_url=settings.sos_api_url,
     )
+    sos_data = GetSosData(sos_client=sos_client)
     raw_writer = RawPayloadWriter(settings.lake_root)
     return WorkerRuntime(
-        sos_client=sos_client,
+        sos_data=sos_data,
         raw_writer=raw_writer,
     )
 
 
 def register_jobs(scheduler: AsyncIOScheduler, runtime: WorkerRuntime) -> None:
     scheduler.add_job(
-        sync_sos_orders_job,
+        sync_sos_endpoints_job,
         trigger="interval",
         minutes=settings.sos_poll_interval_minutes,
         kwargs={
-            "sos_client": runtime.sos_client,
+            "sos_data": runtime.sos_data,
             "raw_writer": runtime.raw_writer,
+            "max_concurrency": 3,
         },
         max_instances=1,
         coalesce=True,
@@ -76,31 +69,27 @@ async def run_worker() -> None:
     configure_logging()
     logger = logging.getLogger(__name__)
 
+    await token_store.warmup_on_startup()
+
     stop_event = asyncio.Event()
+    async with build_http_client() as http_client:
+        runtime = build_runtime(http_client)
+        scheduler = build_scheduler()
+        register_jobs(scheduler, runtime)
+        scheduler.start()
 
-    async with build_token_http_client() as token_http_client:
-        set_token_http_client(token_http_client)
+        logger.info(
+            "SOS worker started; polling every %s minute(s)",
+            settings.sos_poll_interval_minutes,
+        )
+
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            with suppress(NotImplementedError):
+                loop.add_signal_handler(sig, stop_event.set)
+
         try:
-            async with build_http_client() as http_client:
-                runtime = build_runtime(http_client)
-                scheduler = build_scheduler()
-                register_jobs(scheduler, runtime)
-                scheduler.start()
-
-                logger.info(
-                    "SOS worker started; polling every %s minute(s)",
-                    settings.sos_poll_interval_minutes,
-                )
-
-                loop = asyncio.get_running_loop()
-                for sig in (signal.SIGINT, signal.SIGTERM):
-                    with suppress(NotImplementedError):
-                        loop.add_signal_handler(sig, stop_event.set)
-
-                try:
-                    await stop_event.wait()
-                finally:
-                    scheduler.shutdown(wait=False)
-                    logger.info("Worker shutdown complete")
+            await stop_event.wait()
         finally:
-            set_token_http_client(None)
+            scheduler.shutdown(wait=False)
+            logger.info("Worker shutdown complete")

@@ -16,7 +16,7 @@ class SOSEndpoint:
 
 
 class SosSettings(AppBaseSettings):
-    sos_api_url: str = "https://api.example.com"
+    sos_api_url: str = "https://api.sosinventory.com/api/v2"
     sos_static_token: str = Field(default="dev-token", repr=False)
     sos_token_url: str = "https://api.sosinventory.com/oauth2/token"
     sos_client_id: str = ""
@@ -25,27 +25,27 @@ class SosSettings(AppBaseSettings):
     sos_authorization_code: str = ""
     sos_token_refresh_skew_seconds: int = 60
     sos_token_timeout_seconds: float = 30.0
-    sos_auth_header_name: str = "Authorization"
-    sos_auth_header_prefix: str = "Bearer"
     sos_rate_limiter: float = 0.501
     sos_poll_interval_minutes: int = 5
 
     SOS_ENDPOINTS: ClassVar[tuple[SOSEndpoint, ...]] = (
-        SOSEndpoint(name="sales_orders", path="/salesorder", entity_name="sales_order"),
-        SOSEndpoint(name="invoices", path="/invoice", entity_name="invoice"),
-        SOSEndpoint(name="shipments", path="/shipment", entity_name="shipment"),
-        SOSEndpoint(name="payments", path="/payment", entity_name="payment"),
+        SOSEndpoint(
+            name="sales_orders", path="/salesorder/", entity_name="sales_order"
+        ),
+        SOSEndpoint(name="invoices", path="/invoice/", entity_name="invoice"),
+        SOSEndpoint(name="shipments", path="/shipment/", entity_name="shipment"),
+        SOSEndpoint(name="payments", path="/payment/", entity_name="payment"),
         SOSEndpoint(
             name="purchase_orders",
-            path="/purchaseorder",
+            path="/purchaseorder/",
             entity_name="purchase_order",
         ),
         SOSEndpoint(
             name="item_receipts",
-            path="/itemreceipt",
+            path="/itemreceipt/",
             entity_name="item_receipt",
         ),
-        SOSEndpoint(name="items", path="/item", entity_name="item"),
+        SOSEndpoint(name="items", path="/item/", entity_name="item"),
     )
 
     @classmethod

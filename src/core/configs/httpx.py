@@ -9,5 +9,8 @@ class HttpxSettings(AppBaseSettings):
     http_max_keepalive_connections: int = 10
     http_keepalive_expiry_seconds: float = 120.0
 
+    token_warmup_strict: bool = True
+    token_refresh_skew_seconds: int = 60
+
 
 __all__ = ["HttpxSettings"]

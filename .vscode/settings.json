@@ -23,7 +23,6 @@
   ],
   "black-formatter.importStrategy": "useBundled",
 
-  "isort.args": ["--profile", "black"],
 
   "files.exclude": {
     "**/__pycache__": true,

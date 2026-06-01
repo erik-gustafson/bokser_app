@@ -4,32 +4,31 @@ from collections.abc import Mapping
 
 import httpx
 
-from src.integrations._client_settings.auth_strategies import BasicAuth
-from src.integrations._client_settings.base_client import (
+from src.core.config import settings
+from src.integrations._base_client.client_auth import OAuthBearerAuth
+from src.integrations._base_client.base_client import (
     AsyncRateLimiter,
     AuthenticatedHttpClient,
     RetryConfig,
 )
+from src.integrations._base_client.token_cache import (
+    PROVIDER_PRODUCTIV,
+)
 
 
-class BasicApiClient(AuthenticatedHttpClient):
+class ProductivClient(AuthenticatedHttpClient):
     def __init__(
         self,
         *,
         base_url: str | None = None,
-        username: str | None = None,
-        password: str | None = None,
         base_headers: Mapping[str, str] | None = None,
         client: httpx.AsyncClient | None = None,
         timeout: float = 30.0,
         retry: RetryConfig | None = None,
     ) -> None:
         super().__init__(
-            base_url=base_url or "",
-            auth=BasicAuth(
-                username=username or "",
-                password=password or "",
-            ),
+            base_url=base_url or settings.productiv_api_url,
+            auth=OAuthBearerAuth(provider=PROVIDER_PRODUCTIV),
             base_headers=base_headers
             or {
                 "Accept": "application/json",
@@ -38,5 +37,7 @@ class BasicApiClient(AuthenticatedHttpClient):
             client=client,
             timeout=timeout,
             retry=retry,
-            rate_limiter=AsyncRateLimiter(min_interval_sec=0.501),
+            rate_limiter=AsyncRateLimiter(
+                min_interval_sec=settings.productiv_rate_limiter
+            ),
         )

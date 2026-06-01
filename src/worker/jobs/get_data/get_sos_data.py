@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, AsyncIterator
 
 from src.core.config import settings
 from src.core.configs.sos import SOSEndpoint
-from src.integrations.sos_inventory.client import SOSClient
+from src.integrations.sos_client import SOSClient
 from src.storage.raw.writer import RawPayloadWriter
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True, slots=True)
 class EndpointFetchResult:
     endpoint: SOSEndpoint
-    records: list[dict[str, Any]] | None = None
+    records: list[dict[str, Any]] = field(default_factory=list)
     error: Exception | None = None
 
     @property
@@ -54,27 +54,6 @@ class GetSosData:
     async def __aexit__(self, *_: object) -> None:
         await self.close()
 
-    async def get_sales_orders(self) -> list[dict[str, Any]]:
-        return await self.get_raw_sos_data("/salesorder")
-
-    async def get_invoices(self) -> list[dict[str, Any]]:
-        return await self.get_raw_sos_data("/invoice")
-
-    async def get_shipments(self) -> list[dict[str, Any]]:
-        return await self.get_raw_sos_data("/shipment")
-
-    async def get_payments(self) -> list[dict[str, Any]]:
-        return await self.get_raw_sos_data("/payment")
-
-    async def get_purchase_orders(self) -> list[dict[str, Any]]:
-        return await self.get_raw_sos_data("/purchaseorder")
-
-    async def get_item_receipts(self) -> list[dict[str, Any]]:
-        return await self.get_raw_sos_data("/itemreceipt")
-
-    async def get_items(self) -> list[dict[str, Any]]:
-        return await self.get_raw_sos_data("/item")
-
     async def get_raw_sos_data(
         self,
         path: str,
@@ -85,21 +64,21 @@ class GetSosData:
         """
         Paginated GET using SOS params: maxresults/start and any other filters.
         """
-        if self._open_depth > 0:
-            return await self._get_raw_sos_data_with_open_client(
-                path=path,
-                max_results=max_results,
-                archived=archived,
-                max_concurrency=max_concurrency,
-            )
+        should_open = self._open_depth == 0
 
-        async with self:
+        if should_open:
+            await self.open()
+
+        try:
             return await self._get_raw_sos_data_with_open_client(
                 path=path,
                 max_results=max_results,
                 archived=archived,
                 max_concurrency=max_concurrency,
             )
+        finally:
+            if should_open:
+                await self.close()
 
     async def _get_raw_sos_data_with_open_client(
         self,
@@ -118,13 +97,8 @@ class GetSosData:
         first.raise_for_status()
 
         data = first.json()
-        records = data.get("data", [])
+        records = self._extract_records(data, context=f"path={path}")
         total_count = data.get("totalCount", 0)
-
-        if not isinstance(records, list):
-            raise ValueError(
-                f"Expected SOS response data to be a list for path={path}"
-            )
 
         if total_count <= len(records):
             return records
@@ -137,24 +111,17 @@ class GetSosData:
                 start_cursor = (max_results * page_idx) + 1
                 page_params = {**base_params, "start": start_cursor}
 
-                response = await client.get(
-                    path_or_url=path,
-                    params=page_params,
-                )
+                response = await client.get(path_or_url=path, params=page_params)
                 response.raise_for_status()
-
-                page_data = response.json().get("data", [])
-
-                if not isinstance(page_data, list):
-                    raise ValueError(
-                        f"Expected SOS page data to be a list for path={path} page={page_idx}"
-                    )
-
-                return page_data
+                page_records = self._extract_records(
+                    response.json(),
+                    context=f"path={path} page={page_idx}",
+                )
+                return page_records
 
         tasks = [
             asyncio.create_task(fetch_page(page_idx))
-            for page_idx in range(1, total_pages)
+            for page_idx in range(2, total_pages + 1)
         ]
 
         for task in asyncio.as_completed(tasks):
@@ -164,13 +131,6 @@ class GetSosData:
                 logger.exception("Error fetching SOS page for path=%s", path)
 
         return records
-
-    async def get_endpoint_data(
-        self,
-        endpoint: SOSEndpoint,
-    ) -> tuple[SOSEndpoint, list[dict[str, Any]]]:
-        records = await self.get_raw_sos_data(endpoint.path)
-        return endpoint, records
 
     async def iter_endpoint_data(
         self,
@@ -188,7 +148,7 @@ class GetSosData:
         async def fetch_with_limit(endpoint: SOSEndpoint) -> EndpointFetchResult:
             async with semaphore:
                 try:
-                    _, records = await self.get_endpoint_data(endpoint)
+                    records = await self.get_raw_sos_data(endpoint.path)
                     return EndpointFetchResult(endpoint=endpoint, records=records)
                 except Exception as exc:
                     logger.exception("Failed to fetch SOS endpoint=%s", endpoint.name)
@@ -221,12 +181,20 @@ class GetSosData:
                 errors[result.endpoint.name] = str(result.error)
                 continue
 
-            results[result.endpoint.name] = result.records or []
+            results[result.endpoint.name] = result.records
 
         if errors:
             logger.warning("Some SOS endpoints failed: %s", errors)
 
         return results
+
+    def _extract_records(
+        self, payload: dict[str, Any], *, context: str
+    ) -> list[dict[str, Any]]:
+        records = payload.get("data", [])
+        if not isinstance(records, list):
+            raise ValueError(f"Expected SOS response data list ({context})")
+        return records
 
 
 async def sync_sos_endpoints_job(
@@ -246,7 +214,9 @@ async def sync_sos_endpoints_job(
     total_records = 0
 
     async with sos_data:
-        async for result in sos_data.iter_endpoint_data(max_concurrency=max_concurrency):
+        async for result in sos_data.iter_endpoint_data(
+            max_concurrency=max_concurrency
+        ):
             endpoint = result.endpoint
 
             if not result.ok:
@@ -258,7 +228,7 @@ async def sync_sos_endpoints_job(
                 )
                 continue
 
-            records = result.records or []
+            records = result.records
 
             write_result = raw_writer.write_json_payload(
                 source_system="sos_inventory",

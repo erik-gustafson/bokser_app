@@ -4,13 +4,13 @@ import asyncio
 import logging
 import random
 import time
+import httpx
+
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-import httpx
-
-from src.integrations._client_settings.auth_strategies import AuthStrategy
+from src.integrations._base_client.client_auth import AuthStrategy, BasicAuth
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +82,7 @@ class AuthenticatedHttpClient:
         retry: RetryConfig | None = None,
         rate_limiter: AsyncRateLimiter | None = None,
     ) -> None:
+
         self.base_url = base_url.rstrip("/")
         self.auth = auth
         self.base_headers = dict(base_headers or {})
@@ -318,3 +319,33 @@ class AuthenticatedHttpClient:
 
         message = payload.get("message", "")
         return message if isinstance(message, str) else ""
+
+
+class BasicApiClient(AuthenticatedHttpClient):
+    def __init__(
+        self,
+        *,
+        base_url: str | None = None,
+        username: str | None = None,
+        password: str | None = None,
+        base_headers: Mapping[str, str] | None = None,
+        client: httpx.AsyncClient | None = None,
+        timeout: float = 30.0,
+        retry: RetryConfig | None = None,
+    ) -> None:
+        super().__init__(
+            base_url=base_url or "",
+            auth=BasicAuth(
+                username=username or "",
+                password=password or "",
+            ),
+            base_headers=base_headers
+            or {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            client=client,
+            timeout=timeout,
+            retry=retry,
+            rate_limiter=AsyncRateLimiter(min_interval_sec=0.501),
+        )

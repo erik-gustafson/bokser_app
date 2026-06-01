@@ -6,5 +6,4 @@ logs/
 downloads/
 data_lake/
 reporting_archive/
-
 *.log

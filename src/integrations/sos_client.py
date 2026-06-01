@@ -5,18 +5,18 @@ from collections.abc import Mapping
 import httpx
 
 from src.core.config import settings
-from src.integrations._client_settings.auth_strategies import OAuthBearerAuth
-from src.integrations._client_settings.base_client import (
+from src.integrations._base_client.client_auth import OAuthBearerAuth
+from src.integrations._base_client.base_client import (
     AsyncRateLimiter,
     AuthenticatedHttpClient,
     RetryConfig,
 )
-from src.integrations._client_settings.token_cache import (
-    PROVIDER_PRODUCTIV,
+from src.integrations._base_client.token_cache import (
+    PROVIDER_SOS,
 )
 
 
-class ProductivClient(AuthenticatedHttpClient):
+class SOSClient(AuthenticatedHttpClient):
     def __init__(
         self,
         *,
@@ -27,8 +27,8 @@ class ProductivClient(AuthenticatedHttpClient):
         retry: RetryConfig | None = None,
     ) -> None:
         super().__init__(
-            base_url=base_url or settings.productiv_api_url,
-            auth=OAuthBearerAuth(provider=PROVIDER_PRODUCTIV),
+            base_url=base_url or settings.sos_api_url,
+            auth=OAuthBearerAuth(provider=PROVIDER_SOS),
             base_headers=base_headers
             or {
                 "Accept": "application/json",
@@ -37,7 +37,5 @@ class ProductivClient(AuthenticatedHttpClient):
             client=client,
             timeout=timeout,
             retry=retry,
-            rate_limiter=AsyncRateLimiter(
-                min_interval_sec=settings.productiv_rate_limiter
-            ),
+            rate_limiter=AsyncRateLimiter(min_interval_sec=settings.sos_rate_limiter),
         )

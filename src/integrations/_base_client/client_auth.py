@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 from typing import Protocol
 
-from src.integrations._client_settings.token_cache import TokenStore, token_store
+from src.integrations._base_client.token_cache import TokenStore, token_store
 
 
 class AuthStrategy(Protocol):
@@ -29,16 +29,22 @@ class OAuthBearerAuth:
     ) -> None:
         self.provider = provider
         self.tokens = tokens
+        self._last_access_token: str | None = None
 
     async def get_headers(self) -> dict[str, str]:
         access_token = await self.tokens.get_valid_access_token(self.provider)
+        self._last_access_token = access_token
 
         return {
             "Authorization": f"Bearer {access_token}",
         }
 
     async def handle_unauthorized(self) -> bool:
-        refreshed = await self.tokens.force_refresh(self.provider)
+        refreshed = await self.tokens.force_refresh(
+            self.provider,
+            expected_access_token=self._last_access_token,
+            allow_missing_current=True,
+        )
         return refreshed is not None
 
 

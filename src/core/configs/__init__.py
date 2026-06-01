@@ -5,6 +5,7 @@ from .database import DatabaseSettings
 from .httpx import HttpxSettings
 from .sos import SosSettings
 from .productiv import ProductivSettings
+from .acenda import AcendaSettings
 
 __all__ = [
     "AppBaseSettings",
@@ -14,4 +15,5 @@ __all__ = [
     "HttpxSettings",
     "SosSettings",
     "ProductivSettings",
+    "AcendaSettings",
 ]

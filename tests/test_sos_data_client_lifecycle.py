@@ -8,8 +8,8 @@ import httpx
 
 from src.core.config import settings
 from src.core.configs.sos import SOSEndpoint
-from src.worker.jobs.get_data import sos_data as sos_data_module
-from src.worker.jobs.get_data.sos_data import GetSosData, sync_sos_endpoints_job
+from src.worker.jobs.get_data import get_sos_data as sos_data_module
+from src.worker.jobs.get_data.get_sos_data import GetSosData, sync_sos_endpoints_job
 
 
 class _FakeSOSClient:
@@ -29,7 +29,10 @@ class _FakeSOSClient:
 
         self.get_calls += 1
         request = httpx.Request("GET", f"https://example.test{path_or_url}")
-        payload = {"data": [{"path": path_or_url, "params": params or {}}], "totalCount": 1}
+        payload = {
+            "data": [{"path": path_or_url, "params": params or {}}],
+            "totalCount": 1,
+        }
         return httpx.Response(status_code=200, request=request, json=payload)
 
     async def aclose(self) -> None:
@@ -67,7 +70,9 @@ class SOSDataClientLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self._original_enabled_endpoints = self._settings_cls.sos_enabled_endpoints
         self._original_sos_client_cls = sos_data_module.SOSClient
         self.endpoints = (
-            SOSEndpoint(name="sales_orders", path="/salesorder", entity_name="sales_order"),
+            SOSEndpoint(
+                name="sales_orders", path="/salesorder", entity_name="sales_order"
+            ),
             SOSEndpoint(name="invoices", path="/invoice", entity_name="invoice"),
             SOSEndpoint(name="shipments", path="/shipment", entity_name="shipment"),
         )
