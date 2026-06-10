@@ -1,19 +1,21 @@
 ﻿from __future__ import annotations
 
 import json
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Tuple
 from pathlib import Path
 from .base import AppBaseSettings
+
+from src.storage.states.state_store import acenda_state
 
 
 @dataclass(frozen=True, slots=True)
 class AcendaEndpoint:
     name: str
     path: str
-    entity_name: str
     params: dict[str, Any] = field(default_factory=dict)
+    state_data: Tuple[str, ...] | None = None
     enabled: bool = True
 
 
@@ -27,8 +29,9 @@ class AcendaSettings(AppBaseSettings):
     acenda_poll_interval_minutes: int = 5
 
     ACENDA_ENDPOINTS: ClassVar[tuple[AcendaEndpoint, ...]] = (
-        AcendaEndpoint(name="all_orders", path="/order", entity_name="all_orders", params={"query":{"updated_at":{"$gt":None}}}),
-        # AcendaEndpoint(name="query_orders", path="/search/order/", entity_name="query_orders"),
+        AcendaEndpoint(name="new_orders", path="/order", params={"query":{"created_at":{"$gt":None}}}, state_data=("new_orders", "last_created_at")),
+        AcendaEndpoint(name="updated_orders", path="/order", params={"query":{"updated_at":{"$gt":None}}}, state_data=("updated_orders", "last_updated_at")),
+        # AcendaEndpoint(name="query_orders", path="/search/order/"),
     )
 # fmt: on
     @classmethod
@@ -46,21 +49,28 @@ class AcendaSettings(AppBaseSettings):
     @classmethod
     def get_acenda_endpoint_params(
         cls,
-        endpoint_name: str,
-        watermark: str | None = None,
+        file_path: Path,
+        endpoint: AcendaEndpoint,
     ) -> dict:
-        
 
-        if endpoint_name == "all_orders":
+        watermark = (cls.get_acenda_watermark(file_path=file_path, endpoint=endpoint))
 
-            one_day_back = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        if endpoint.name == "new_orders":
+                        
+            return {
+                "query": json.dumps({
+                    "created_at": {
+                        "$gt": watermark
+                    }
+                })
+            }
 
-            updated_after = watermark or one_day_back
-            
+        if endpoint.name == "updated_orders":
+                        
             return {
                 "query": json.dumps({
                     "updated_at": {
-                        "$gt": updated_after
+                        "$gt": watermark
                     }
                 })
             }
@@ -68,22 +78,38 @@ class AcendaSettings(AppBaseSettings):
         return {}
 
     @classmethod
-    def get_acenda_endpoint_watermark(cls, file_path: Path, name:str) -> str | None:
+    def get_acenda_watermark(cls, file_path: Path, endpoint: AcendaEndpoint) -> str | None:
 
-        if not name:
-            return None
+        one_day_back = cls.acenda_timestamp_format(datetime.now(timezone.utc) - timedelta(days=1))
 
-        if name == "all_orders":
+        try:
+            if not endpoint.state_data:
+                raise Exception
+            
+            state_dict_dt = acenda_state._state[endpoint.state_data[0]][endpoint.state_data[1]]
+
+            if state_dict_dt:
+                return state_dict_dt
+
             with open(file_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-
-            watermark = data.get("all_orders", {}).get("last_updated_date", None)
-
+                data: dict = json.load(f)
+            watermark = data[endpoint.state_data[0]][endpoint.state_data[1]]
             return watermark
         
-        else:
-            return None
+        except:
+            return one_day_back
 
+
+    @classmethod
+    def acenda_timestamp_format(cls, dt: date | datetime | None) -> str:
+
+        if not dt:
+            return (datetime.now(timezone.utc)).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        if isinstance(dt, datetime):
+            return dt.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        if isinstance(dt, date):
+            dt_comb = datetime.combine(dt, datetime.min.time(), tzinfo=timezone.utc)
+            return dt_comb.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
     @property
     def acenda_base_headers(self) -> dict[str, str]:

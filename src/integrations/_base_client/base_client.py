@@ -171,13 +171,19 @@ class AuthenticatedHttpClient:
             await self.rate_limiter.wait()
 
             try:
+                auth_headers = await self.auth.get_headers()
+                request_headers = self._merge_headers(
+                    auth_headers.headers,
+                    extra_headers=headers,
+                )
+
                 response = await self.client.request(
                     method=method,
                     url=url,
                     params=params,
                     json=json_data,
                     data=data,
-                    headers=await self._headers(headers),
+                    headers=request_headers,
                 )
             except (
                 httpx.TimeoutException,
@@ -199,7 +205,7 @@ class AuthenticatedHttpClient:
             if self._is_unauthorized(response) and not recovered_after_unauthorized:
                 recovered_after_unauthorized = True
 
-                if await self.auth.handle_unauthorized():
+                if await self.auth.handle_unauthorized(auth_headers):
                     logger.info(
                         "Recovered from unauthorized response; retrying method=%s",
                         method,
@@ -223,11 +229,14 @@ class AuthenticatedHttpClient:
 
             return response
 
-    async def _headers(
-        self, extra_headers: Mapping[str, str] | None = None
+    def _merge_headers(
+        self,
+        auth_headers: dict[str, str],
+        *,
+        extra_headers: Mapping[str, str] | None = None,
     ) -> dict[str, str]:
         headers = dict(self.base_headers)
-        headers.update(await self.auth.get_headers())
+        headers.update(auth_headers)
 
         if extra_headers:
             headers.update(extra_headers)
@@ -249,7 +258,7 @@ class AuthenticatedHttpClient:
 
         # Some APIs return HTTP 200 with an application-level throttle message.
         if (
-            response.status_code == 200
+            response.status_code in [200, 400]
             and self._json_message(response) == self.THROTTLE_MESSAGE
         ):
             return True

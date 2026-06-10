@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from src.integrations._client_settings.token_cache import token_store
+from src.integrations._base_client.token_cache import token_store
 
 
 @asynccontextmanager

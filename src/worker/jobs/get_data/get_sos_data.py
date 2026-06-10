@@ -2,26 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
-from typing import Any, AsyncIterator
+
+from typing import Any
+from pathlib import Path
+from datetime import date, datetime, timezone
+from collections.abc import AsyncIterator
 
 from src.core.config import settings
 from src.core.configs.sos import SOSEndpoint
 from src.integrations.sos_client import SOSClient
-from src.storage.raw.writer import RawPayloadWriter
+from src.storage.states.state_store import sos_state
+from src.worker.jobs.get_data.base_get import EndpointFetchResult
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True, slots=True)
-class EndpointFetchResult:
-    endpoint: SOSEndpoint
-    records: list[dict[str, Any]] = field(default_factory=list)
-    error: Exception | None = None
-
-    @property
-    def ok(self) -> bool:
-        return self.error is None
 
 
 class GetSosData:
@@ -32,9 +25,18 @@ class GetSosData:
     """
 
     def __init__(self, *, sos_client: SOSClient | None = None) -> None:
+        self.source_name: str = "sos_inventory"
         self.sos_client = sos_client or SOSClient()
         self._owns_sos_client = sos_client is None
         self._open_depth = 0
+        self.run_started_at = settings.sos_timestamp_format(None)
+        self.state_file: Path = (
+            settings.lake_root
+            / "raw"
+            / "sos_inventory"
+            / "_state"
+            / "sos_query_state.json"
+        )
 
     async def open(self) -> None:
         self._open_depth += 1
@@ -56,7 +58,8 @@ class GetSosData:
 
     async def get_raw_sos_data(
         self,
-        path: str,
+        *,
+        endpoint: SOSEndpoint,
         max_results: int = 200,
         archived: str = "no",
         max_concurrency: int = 5,
@@ -71,7 +74,7 @@ class GetSosData:
 
         try:
             return await self._get_raw_sos_data_with_open_client(
-                path=path,
+                endpoint=endpoint,
                 max_results=max_results,
                 archived=archived,
                 max_concurrency=max_concurrency,
@@ -83,22 +86,39 @@ class GetSosData:
     async def _get_raw_sos_data_with_open_client(
         self,
         *,
-        path: str,
+        endpoint: SOSEndpoint,
         max_results: int,
         archived: str,
         max_concurrency: int,
     ) -> list[dict[str, Any]]:
+        path = endpoint.path
+        endpoint_params = settings.get_sos_endpoint_params(
+            file_path=self.state_file, endpoint=endpoint
+        )
         base_params = {
+            **endpoint_params,
             "maxresults": max_results,
             "archived": archived,
         }
-        client = self.sos_client
-        first = await client.get(path_or_url=path, params=base_params)
-        first.raise_for_status()
 
-        data = first.json()
-        records = self._extract_records(data, context=f"path={path}")
-        total_count = data.get("totalCount", 0)
+        client = self.sos_client
+
+        first_response = await client.get(
+            path_or_url=path,
+            params=base_params,
+        )
+        if first_response.status_code != 200:
+            breakpoint
+        first_response.raise_for_status()
+
+        first_payload = first_response.json()
+
+        records = self._extract_records(
+            first_payload,
+            context=f"path={path} page=1",
+        )
+
+        total_count = int(first_payload.get("totalCount")) or 0
 
         if total_count <= len(records):
             return records
@@ -112,6 +132,8 @@ class GetSosData:
                 page_params = {**base_params, "start": start_cursor}
 
                 response = await client.get(path_or_url=path, params=page_params)
+                if response.status_code != 200:
+                    breakpoint
                 response.raise_for_status()
                 page_records = self._extract_records(
                     response.json(),
@@ -121,7 +143,7 @@ class GetSosData:
 
         tasks = [
             asyncio.create_task(fetch_page(page_idx))
-            for page_idx in range(2, total_pages + 1)
+            for page_idx in range(2, total_pages)
         ]
 
         for task in asyncio.as_completed(tasks):
@@ -133,22 +155,25 @@ class GetSosData:
         return records
 
     async def iter_endpoint_data(
-        self,
-        *,
-        max_concurrency: int = 3,
-    ) -> AsyncIterator[EndpointFetchResult]:
+        self, *, max_concurrency: int = 3, interval_ms: int = 501
+    ) -> AsyncIterator[EndpointFetchResult[SOSEndpoint]]:
         """
         Yields each endpoint result as soon as it finishes.
 
         This allows the job to write each raw payload immediately instead of
         waiting for every endpoint to finish.
         """
+
         semaphore = asyncio.Semaphore(max_concurrency)
 
-        async def fetch_with_limit(endpoint: SOSEndpoint) -> EndpointFetchResult:
+        async def fetch_with_limit(
+            endpoint: SOSEndpoint,
+        ) -> EndpointFetchResult[SOSEndpoint]:
             async with semaphore:
                 try:
-                    records = await self.get_raw_sos_data(endpoint.path)
+                    records = await self.get_raw_sos_data(
+                        endpoint=endpoint, max_concurrency=max_concurrency
+                    )
                     return EndpointFetchResult(endpoint=endpoint, records=records)
                 except Exception as exc:
                     logger.exception("Failed to fetch SOS endpoint=%s", endpoint.name)
@@ -162,93 +187,28 @@ class GetSosData:
         for task in asyncio.as_completed(tasks):
             yield await task
 
-    async def get_all_endpoint_data(
-        self,
-        *,
-        max_concurrency: int = 3,
-    ) -> dict[str, list[dict[str, Any]]]:
-        """
-        Returns all endpoint data after all endpoint fetches complete.
-
-        Keep this only if something else needs the full in-memory dict.
-        For raw-file writing, prefer iter_endpoint_data(...).
-        """
-        results: dict[str, list[dict[str, Any]]] = {}
-        errors: dict[str, str] = {}
-
-        async for result in self.iter_endpoint_data(max_concurrency=max_concurrency):
-            if not result.ok:
-                errors[result.endpoint.name] = str(result.error)
-                continue
-
-            results[result.endpoint.name] = result.records
-
-        if errors:
-            logger.warning("Some SOS endpoints failed: %s", errors)
-
-        return results
-
     def _extract_records(
-        self, payload: dict[str, Any], *, context: str
+        self,
+        payload: dict[str, Any],
+        *,
+        context: str,
     ) -> list[dict[str, Any]]:
         records = payload.get("data", [])
+
         if not isinstance(records, list):
             raise ValueError(f"Expected SOS response data list ({context})")
+
         return records
 
+    def _serialize_datetime(self, value: date | datetime | None) -> str:
+        if value is None:
+            return datetime.now(timezone.utc).isoformat()
+        if isinstance(value, datetime):
+            dt = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc).isoformat()
+        dt = datetime.combine(value, datetime.min.time(), tzinfo=timezone.utc)
+        return dt.isoformat()
 
-async def sync_sos_endpoints_job(
-    *,
-    sos_data: GetSosData,
-    raw_writer: RawPayloadWriter,
-    max_concurrency: int = 3,
-) -> None:
-    """
-    Fetch all enabled SOS endpoints and write each endpoint payload as soon
-    as that endpoint finishes.
+    async def update_state_file(self, state_type: str, records: list[dict[str, Any]]):
 
-    RawPayloadWriter stays lightweight: it only writes the payload it is given.
-    """
-    successful_endpoints = 0
-    failed_endpoints = 0
-    total_records = 0
-
-    async with sos_data:
-        async for result in sos_data.iter_endpoint_data(
-            max_concurrency=max_concurrency
-        ):
-            endpoint = result.endpoint
-
-            if not result.ok:
-                failed_endpoints += 1
-                logger.warning(
-                    "Skipping raw write for SOS endpoint=%s due to fetch error: %s",
-                    endpoint.name,
-                    result.error,
-                )
-                continue
-
-            records = result.records
-
-            write_result = raw_writer.write_json_payload(
-                source_system="sos_inventory",
-                entity_name=endpoint.name,
-                payload=records,
-            )
-
-            successful_endpoints += 1
-            total_records += write_result.record_count
-
-            logger.info(
-                "Fetched and wrote SOS endpoint=%s records=%s file=%s",
-                endpoint.name,
-                write_result.record_count,
-                write_result.file_path,
-            )
-
-    logger.info(
-        "Finished SOS endpoint sync. successful_endpoints=%s failed_endpoints=%s total_records=%s",
-        successful_endpoints,
-        failed_endpoints,
-        total_records,
-    )
+        await sos_state.update({state_type: {"last_run_at": self.run_started_at}})

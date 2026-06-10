@@ -23,7 +23,7 @@ class AcendaClient(AuthenticatedHttpClient):
         base_url: str | None = None,
         base_headers: Mapping[str, str] | None = None,
         client: httpx.AsyncClient | None = None,
-        timeout: float = 30.0,
+        timeout: float = settings.http_timeout_seconds,
         retry: RetryConfig | None = None,
     ) -> None:
         super().__init__(

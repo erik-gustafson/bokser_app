@@ -1,42 +1,46 @@
 import asyncio
 
 from src.core.config import settings
+
 from src.integrations._base_client.token_cache import token_store
+
+from src.worker.jobs.get_data.base_get import sync_endpoints_job
+
 from src.storage.raw.writer import RawPayloadWriter
-from src.worker.jobs.get_data.get_acenda_data import (
-    GetAcendaData,
-    sync_acenda_endpoints_job,
-)
-from src.worker.jobs.get_data.get_sos_data import GetSosData, sync_sos_endpoints_job
+from src.storage.states.state_store import warmup_state_files
+
+from src.worker.jobs.get_data.get_acenda_data import GetAcendaData
+from src.worker.jobs.get_data.get_sos_data import GetSosData
 
 LAKE_ROOT = settings.lake_root
 
 
-async def sos_main() -> None:
+async def warmup_tokens() -> None:
+
     await token_store.warmup_on_startup()
 
-    sos_data = GetSosData()
-    raw_writer = RawPayloadWriter(LAKE_ROOT)
 
-    await sync_sos_endpoints_job(
-        sos_data=sos_data,
-        raw_writer=raw_writer,
-        max_concurrency=6,
+async def sos_main() -> None:
+
+    await sync_endpoints_job(
+        target_data_factory=GetSosData,
+        raw_writer=RawPayloadWriter(LAKE_ROOT),
+        max_concurrency=10,
     )
 
 
 async def acenda_main() -> None:
-    await token_store.warmup_on_startup()
 
-    acenda_data = GetAcendaData()
-    raw_writer = RawPayloadWriter(LAKE_ROOT)
-
-    await sync_acenda_endpoints_job(
-        acenda_data=acenda_data,
-        raw_writer=raw_writer,
-        max_concurrency=20,
+    await sync_endpoints_job(
+        target_data_factory=GetAcendaData,
+        raw_writer=RawPayloadWriter(LAKE_ROOT),
+        max_concurrency=10,
     )
 
 
 if __name__ == "__main__":
+
+    asyncio.run(warmup_tokens())
+    asyncio.run(warmup_state_files())
     asyncio.run(acenda_main())
+    asyncio.run(sos_main())
