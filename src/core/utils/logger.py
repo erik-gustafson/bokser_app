@@ -1,10 +1,10 @@
-# app/core/logging.py
 import os
 import logging
+import tempfile
 from logging.handlers import TimedRotatingFileHandler
 
-DEFAULT_LOG_DIR = os.getenv("LOG_DIR", "/app/logs")
-FALLBACK_LOG_DIR = os.path.join(os.getcwd(), "logs")
+DEFAULT_LOG_DIR = os.getenv("LOGS_ROOT") or os.getenv("LOG_DIR", "/app/logs")
+FALLBACK_LOG_DIR = os.path.join(tempfile.gettempdir(), "bokser_app_logs")
 
 
 def _build_file_handler(filepath: str) -> TimedRotatingFileHandler:
@@ -47,14 +47,18 @@ def setup_logging(log_file: str):
     for h in logger.handlers[:]:
         logger.removeHandler(h)
 
-    # Add rotating file handler
-    logger.addHandler(get_file_handler(log_file))
-
     # Add console handler for docker logs
     console = logging.StreamHandler()
     console.setFormatter(logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     ))
     logger.addHandler(console)
+
+    # Prefer file logging, but keep the process alive if the mounted log
+    # directory is not writable in the runtime environment.
+    try:
+        logger.addHandler(get_file_handler(log_file))
+    except OSError as exc:
+        logger.warning("File logging disabled for %s: %s", log_file, exc)
 
     return logger
