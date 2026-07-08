@@ -7,6 +7,8 @@ from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Self, Protocol, Generic, TypeVar
 from src.storage.raw.writer import RawPayloadWriter
+from src.database.database import async_session
+from src.database.models.data_lake_models import DataLakeFile
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +26,7 @@ class EndpointFetchResult(Generic[EndpointT]):
         return self.error is None
 
 
-class TargetData(Protocol):
+class TargetSource(Protocol):
 
     @property
     def source_name(self) -> str: ...
@@ -48,7 +50,7 @@ class TargetData(Protocol):
 
 async def sync_endpoints_job(
     *,
-    target_data_factory: Callable[[], TargetData],
+    target_source_factory: Callable[[], TargetSource],
     raw_writer: RawPayloadWriter,
     max_concurrency: int = 3,
 ) -> None:
@@ -56,12 +58,12 @@ async def sync_endpoints_job(
     failed_endpoints = 0
     total_records = 0
 
-    target_data = target_data_factory()
+    target_source_data = target_source_factory()
 
-    source_name = target_data.source_name
+    source_name = target_source_data.source_name
 
-    async with target_data:
-        async for result in target_data.iter_endpoint_data(
+    async with target_source_data:
+        async for result in target_source_data.iter_endpoint_data(
             max_concurrency=max_concurrency,
         ):
             endpoint = result.endpoint
@@ -77,6 +79,10 @@ async def sync_endpoints_job(
 
             endpoint_name = endpoint.name
             records = result.records
+            successful_endpoints += 1
+
+            if not records:
+                continue
 
             write_result = raw_writer.write_json_payload(
                 source_system=source_name,
@@ -84,7 +90,23 @@ async def sync_endpoints_job(
                 payload=records,
             )
 
-            successful_endpoints += 1
+            async with async_session() as session:
+
+                async with session.begin():
+                    session.add(
+                        DataLakeFile(
+                            source_name=source_name,
+                            entity_name=endpoint_name,
+                            file_path=str(write_result.file_path),
+                            file_name=write_result.file_name,
+                            record_count=write_result.record_count,
+                            file_size_bytes=write_result.file_size_bytes,
+                            sha256=write_result.sha256,
+                            landed_at=write_result.written_at_utc,
+                            status="LANDED",
+                        )
+                    )
+
             total_records += write_result.record_count
 
             logger.info(
@@ -94,14 +116,10 @@ async def sync_endpoints_job(
                 write_result.file_path,
             )
 
-            if records:
-                await target_data.update_state_file(
-                    state_type=endpoint_name, records=records
-                )
+            await target_source_data.update_state_file(
+                state_type=endpoint_name, records=records
+            )
 
     logger.info(
-        f"Finished {source_name} endpoint sync. successful_endpoints=%s failed_endpoints=%s total_records=%s",
-        successful_endpoints,
-        failed_endpoints,
-        total_records,
+        f"Finished {source_name} endpoint sync. successful_endpoints={successful_endpoints} failed_endpoints={failed_endpoints} total_records={total_records}"
     )

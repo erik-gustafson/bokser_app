@@ -19,6 +19,7 @@ from src.storage.raw.writer import RawPayloadWriter
 from src.worker.jobs.get_data.get_sos_data import GetSosData
 from src.worker.jobs.get_data.get_acenda_data import GetAcendaData
 from src.worker.jobs.get_data.base_get import sync_endpoints_job
+from src.worker.jobs.process_data.acenda.process_acenda_data import load_acenda_lake_job
 from src.storage.states.state_store import warmup_state_files
 
 
@@ -60,9 +61,9 @@ def register_jobs(
         trigger="interval",
         minutes=settings.sos_poll_interval_minutes,
         kwargs={
-            "target_data_factory": runtime.sos_data_factory,
+            "target_source_factory": runtime.sos_data_factory,
             "raw_writer": runtime.raw_writer,
-            "max_concurrency": 5,
+            "max_concurrency": 15,
         },
         max_instances=1,
         coalesce=True,
@@ -79,13 +80,22 @@ def register_jobs(
         trigger="interval",
         minutes=settings.acenda_poll_interval_minutes,
         kwargs={
-            "target_data_factory": runtime.acenda_data_factory,
+            "target_source_factory": runtime.acenda_data_factory,
             "raw_writer": runtime.raw_writer,
             "max_concurrency": 5,
         },
         max_instances=1,
         coalesce=True,
         misfire_grace_time=60,
+    )
+
+    scheduler.add_job(
+        load_acenda_lake_job,
+        "interval",
+        minutes=5,
+        id="load_acenda_lake_files",
+        max_instances=1,
+        coalesce=True,
     )
 
     logger.info(

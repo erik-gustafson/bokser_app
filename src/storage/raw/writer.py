@@ -4,6 +4,7 @@ import csv
 import json
 import mimetypes
 import re
+import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import StrEnum
@@ -44,6 +45,7 @@ class RawWriteResult:
     metadata_path: Path | None
     record_count: int
     file_size_bytes: int
+    sha256: str
     written_at_utc: datetime
     file_type: str
 
@@ -70,15 +72,16 @@ class RawPayloadWriter:
             now=now,
         )
 
-        file_name = self._build_file_name(
+        file_name, ingestion_id = self._build_file_name(
             entity_name=safe_entity_name,
             file_type=RawFileType.JSON,
             now=now,
         )
         file_path = out_dir / file_name
 
+        tmp_path = file_path.with_suffix(".tmp")
+
         record_count = len(payload) if isinstance(payload, list) else 1
-        ingestion_id = uuid4().hex
 
         wrapped_payload = {
             "metadata": {
@@ -93,9 +96,14 @@ class RawPayloadWriter:
             "payload": payload,
         }
 
-        with file_path.open("w", encoding="utf-8") as f:
+        with tmp_path.open("w", encoding="utf-8") as f:
             json.dump(wrapped_payload, f, indent=2, ensure_ascii=False, default=str)
             f.write("\n")
+
+        tmp_path.replace(file_path)
+
+        file_bytes = file_path.read_bytes()
+        checksum = hashlib.sha256(file_bytes).hexdigest()
 
         return RawWriteResult(
             file_path=file_path,
@@ -104,6 +112,7 @@ class RawPayloadWriter:
             record_count=record_count,
             file_size_bytes=file_path.stat().st_size,
             written_at_utc=now,
+            sha256=checksum,
             file_type=RawFileType.JSON.value,
         )
 
@@ -130,20 +139,26 @@ class RawPayloadWriter:
             now=now,
         )
 
-        file_name = self._build_file_name(
+        file_name, ingestion_id = self._build_file_name(
             entity_name=safe_entity_name,
             file_type=safe_file_type,
             now=now,
         )
+
         file_path = out_dir / file_name
 
-        record_count = 0
+        #
+        tmp_path = file_path.with_suffix(".tmp")
 
-        with file_path.open("w", encoding="utf-8") as f:
+        record_count = 0
+        #
+        with tmp_path.open("w", encoding="utf-8") as f:
             for record in records:
                 f.write(json.dumps(record, ensure_ascii=False, default=str))
                 f.write("\n")
                 record_count += 1
+        #
+        tmp_path.replace(file_path)
 
         metadata_path = self._write_sidecar_metadata(
             file_path=file_path,
@@ -152,8 +167,12 @@ class RawPayloadWriter:
             file_type=safe_file_type,
             record_count=record_count,
             written_at_utc=now,
+            ingestion_id=ingestion_id,
             metadata=metadata,
         )
+
+        file_bytes = file_path.read_bytes()
+        checksum = hashlib.sha256(file_bytes).hexdigest()
 
         return RawWriteResult(
             file_path=file_path,
@@ -162,6 +181,7 @@ class RawPayloadWriter:
             record_count=record_count,
             file_size_bytes=file_path.stat().st_size,
             written_at_utc=now,
+            sha256=checksum,
             file_type=safe_file_type,
         )
 
@@ -189,20 +209,24 @@ class RawPayloadWriter:
             now=now,
         )
 
-        file_name = self._build_file_name(
+        file_name, ingestion_id = self._build_file_name(
             entity_name=safe_entity_name,
             file_type=safe_file_type,
             now=now,
         )
         file_path = out_dir / file_name
 
+        tmp_path = file_path.with_suffix(".tmp")
+
         rows_list = list(rows)
         fieldnames = sorted({key for row in rows_list for key in row.keys()})
 
-        with file_path.open("w", encoding="utf-8", newline="") as f:
+        with tmp_path.open("w", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=delimiter)
             writer.writeheader()
             writer.writerows(rows_list)
+
+        tmp_path.replace(file_path)
 
         metadata_path = self._write_sidecar_metadata(
             file_path=file_path,
@@ -211,8 +235,12 @@ class RawPayloadWriter:
             file_type=safe_file_type,
             record_count=len(rows_list),
             written_at_utc=now,
+            ingestion_id=ingestion_id,
             metadata=metadata,
         )
+
+        file_bytes = file_path.read_bytes()
+        checksum = hashlib.sha256(file_bytes).hexdigest()
 
         return RawWriteResult(
             file_path=file_path,
@@ -221,6 +249,7 @@ class RawPayloadWriter:
             record_count=len(rows_list) if isinstance(rows_list, list) else 1,
             file_size_bytes=file_path.stat().st_size,
             written_at_utc=now,
+            sha256=checksum,
             file_type=safe_file_type,
         )
 
@@ -245,14 +274,18 @@ class RawPayloadWriter:
             now=now,
         )
 
-        file_name = self._build_file_name(
+        file_name, ingestion_id = self._build_file_name(
             entity_name=safe_entity_name,
             file_type=safe_file_type,
             now=now,
         )
         file_path = out_dir / file_name
 
-        file_path.write_bytes(file_bytes)
+        tmp_path = file_path.with_suffix(".tmp")
+
+        tmp_path.write_bytes(file_bytes)
+
+        tmp_path.replace(file_path)
 
         metadata_path = self._write_sidecar_metadata(
             file_path=file_path,
@@ -261,6 +294,7 @@ class RawPayloadWriter:
             file_type=safe_file_type,
             record_count=0,
             written_at_utc=now,
+            ingestion_id=ingestion_id,
             metadata={
                 "original_file_name": original_file_name,
                 "content_type": mimetypes.guess_type(original_file_name or file_name)[
@@ -270,6 +304,9 @@ class RawPayloadWriter:
             },
         )
 
+        file_bytes = file_path.read_bytes()
+        checksum = hashlib.sha256(file_bytes).hexdigest()
+
         return RawWriteResult(
             file_path=file_path,
             file_name=file_name,
@@ -277,6 +314,7 @@ class RawPayloadWriter:
             record_count=0,
             file_size_bytes=file_path.stat().st_size,
             written_at_utc=now,
+            sha256=checksum,
             file_type=safe_file_type,
         )
 
@@ -305,10 +343,13 @@ class RawPayloadWriter:
         entity_name: str,
         file_type: RawFileType | str,
         now: datetime,
-    ) -> str:
+    ) -> tuple[str, str]:
         safe_file_type = RawPayloadWriter._safe_file_type(file_type)
+        ingestion_id = uuid4().hex
+
         return (
-            f"{entity_name}_{now:%Y%m%dT%H%M%SZ}_" f"{uuid4().hex[:8]}.{safe_file_type}"
+            f"{entity_name}_{now:%Y%m%dT%H%M%S}_" f"{ingestion_id}.{safe_file_type}",
+            ingestion_id,
         )
 
     @staticmethod
@@ -345,10 +386,10 @@ class RawPayloadWriter:
         file_type: str,
         record_count: int | None,
         written_at_utc: datetime,
+        ingestion_id: str,
         metadata: Mapping[str, Any] | None,
     ) -> Path:
         metadata_path = file_path.with_suffix(file_path.suffix + ".metadata.json")
-        ingestion_id = uuid4().hex
 
         sidecar = {
             "source_system": source_system,

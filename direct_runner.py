@@ -1,5 +1,5 @@
 import asyncio
-
+from pathlib import Path
 from src.core.config import settings
 
 from src.integrations._base_client.token_cache import token_store
@@ -12,6 +12,8 @@ from src.storage.states.state_store import warmup_state_files
 from src.worker.jobs.get_data.get_acenda_data import GetAcendaData
 from src.worker.jobs.get_data.get_sos_data import GetSosData
 
+from src.worker.jobs.process_data.acenda.process_acenda_data import load_acenda_lake_job
+
 LAKE_ROOT = settings.lake_root
 
 
@@ -23,7 +25,7 @@ async def warmup_tokens() -> None:
 async def sos_main() -> None:
 
     await sync_endpoints_job(
-        target_data_factory=GetSosData,
+        target_source_factory=GetSosData,
         raw_writer=RawPayloadWriter(LAKE_ROOT),
         max_concurrency=10,
     )
@@ -32,13 +34,20 @@ async def sos_main() -> None:
 async def acenda_main() -> None:
 
     await sync_endpoints_job(
-        target_data_factory=GetAcendaData,
+        target_source_factory=GetAcendaData,
         raw_writer=RawPayloadWriter(LAKE_ROOT),
         max_concurrency=10,
     )
 
 
 if __name__ == "__main__":
+
+    asyncio.run(load_acenda_lake_job())
+
+    # data = get_json_data(
+    #     path=Path(r"C:\Users\erik\Code\data_lake\dev\raw\acenda"),
+    #     data_type="new_orders",
+    # )
 
     asyncio.run(warmup_tokens())
     asyncio.run(warmup_state_files())

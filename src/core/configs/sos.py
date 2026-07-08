@@ -23,7 +23,6 @@ class SOSEndpoint:
 # fmt: off
 class SosSettings(AppBaseSettings):
     sos_api_url: str = "https://api.sosinventory.com/api/v2"
-    sos_static_token: str = Field(default="dev-token", repr=False)
     sos_token_url: str = "https://api.sosinventory.com/oauth2/token"
     sos_client_id: str = ""
     sos_client_secret: str = ""

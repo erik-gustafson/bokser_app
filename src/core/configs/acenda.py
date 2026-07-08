@@ -14,6 +14,7 @@ from src.storage.states.state_store import acenda_state
 class AcendaEndpoint:
     name: str
     path: str
+    data_type: str
     params: dict[str, Any] = field(default_factory=dict)
     state_data: Tuple[str, ...] | None = None
     enabled: bool = True
@@ -29,8 +30,10 @@ class AcendaSettings(AppBaseSettings):
     acenda_poll_interval_minutes: int = 5
 
     ACENDA_ENDPOINTS: ClassVar[tuple[AcendaEndpoint, ...]] = (
-        AcendaEndpoint(name="new_orders", path="/order", params={"query":{"created_at":{"$gt":None}}}, state_data=("new_orders", "last_created_at")),
-        AcendaEndpoint(name="updated_orders", path="/order", params={"query":{"updated_at":{"$gt":None}}}, state_data=("updated_orders", "last_updated_at")),
+        AcendaEndpoint(name="new_orders", path="/order", params={"query":{"created_at":{"$gt":None}}}, state_data=("new_orders", "last_created_at"), data_type="new"),
+        AcendaEndpoint(name="updated_orders", path="/order", params={"query":{"updated_at":{"$gt":None}}}, state_data=("updated_orders", "last_updated_at"), data_type="update"),
+        AcendaEndpoint(name="new_ship_advices", path="/ship_advice", params={"query":{"created_at":{"$gt":None}}}, state_data=("new_ship_advices", "last_created_at"), data_type="new"),
+        AcendaEndpoint(name="updated_ship_advices", path="/ship_advice", params={"query":{"updated_at":{"$gt":None}}}, state_data=("updated_ship_advices", "last_updated_at"), data_type="update"),
         # AcendaEndpoint(name="query_orders", path="/search/order/"),
     )
 # fmt: on
@@ -55,7 +58,7 @@ class AcendaSettings(AppBaseSettings):
 
         watermark = (cls.get_acenda_watermark(file_path=file_path, endpoint=endpoint))
 
-        if endpoint.name == "new_orders":
+        if endpoint.name in ["new_orders", "new_ship_advices"]:
                         
             return {
                 "query": json.dumps({
@@ -65,7 +68,7 @@ class AcendaSettings(AppBaseSettings):
                 })
             }
 
-        if endpoint.name == "updated_orders":
+        if endpoint.name in ["updated_orders", "updated_ship_advices"]:
                         
             return {
                 "query": json.dumps({
