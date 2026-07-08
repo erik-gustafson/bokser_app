@@ -6,12 +6,18 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 USER root
 
+USER root
+
 WORKDIR /app
 
 COPY docker/requirements.txt /app/requirements.txt
 
 RUN python -m pip install --no-cache-dir -r /app/requirements.txt
+COPY docker/requirements.txt /app/requirements.txt
 
+RUN python -m pip install --no-cache-dir -r /app/requirements.txt
+
+RUN rm -f /app/requirements.txt
 RUN rm -f /app/requirements.txt
 
 COPY alembic.ini /app/alembic.ini
@@ -24,3 +30,4 @@ RUN id -u appuser >/dev/null 2>&1 || useradd --create-home --shell /usr/sbin/nol
 USER appuser
 
 CMD ["python", "-m", "src.worker.worker"]
+
