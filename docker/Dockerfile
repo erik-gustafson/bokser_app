@@ -4,19 +4,22 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
+USER root
+
 WORKDIR /app
 
-COPY docker/requirements.txt /tmp/requirements.txt
+COPY docker/requirements.txt /app/requirements.txt
 
-RUN pip install --no-cache-dir -r /tmp/requirements.txt \
-    && rm -f /tmp/requirements.txt
+RUN python -m pip install --no-cache-dir -r /app/requirements.txt
+
+RUN rm -f /app/requirements.txt
 
 COPY alembic.ini /app/alembic.ini
 COPY src /app/src
 
-RUN useradd --create-home --shell /usr/sbin/nologin appuser \
-    && mkdir -p /data_lake /app/logs /app/downloads /app/test_downloads /app/reporting_archive \
-    && chown -R appuser:appuser /app /data_lake /app/logs /app/downloads /app/test_downloads /app/reporting_archive
+RUN id -u appuser >/dev/null 2>&1 || useradd --create-home --shell /usr/sbin/nologin appuser \
+    && mkdir -p /data_lake /app/logs /app/downloads /app/test_downloads /app/reporting_archive /app/state \
+    && chown -R appuser:appuser /app /data_lake /app/logs /app/downloads /app/test_downloads /app/reporting_archive /app/state
 
 USER appuser
 
