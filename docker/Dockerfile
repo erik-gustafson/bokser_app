@@ -24,8 +24,8 @@ COPY alembic.ini /app/alembic.ini
 COPY src /app/src
 
 RUN id -u appuser >/dev/null 2>&1 || useradd --create-home --shell /usr/sbin/nologin appuser \
-    && mkdir -p /data_lake /app/logs /app/downloads /app/test_downloads /app/reporting_archive /app/state \
-    && chown -R appuser:appuser /app /data_lake /app/logs /app/downloads /app/test_downloads /app/reporting_archive /app/state
+    && mkdir -p /data_lake /app/logs /app/downloads /app/test_downloads /app/reporting_archive \
+    && chown -R appuser:appuser /app /data_lake /app/logs /app/downloads /app/test_downloads /app/reporting_archive
 
 USER appuser
 

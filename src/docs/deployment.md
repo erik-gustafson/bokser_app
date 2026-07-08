@@ -71,12 +71,10 @@ Production `docker/.env` should align with:
 - `LOGS_ROOT=/app/logs`
 - `DOWNLOADS_ROOT=/app/downloads`
 - `REPORTING_ARCHIVE_ROOT=/app/reporting_archive`
-- `STATE_ROOT=/app/state`
 - `LAKE_HOST_PATH=/volume1/data_lake/prod`
 - `LOGS_HOST_PATH=/volume1/docker/bokser_app/logs`
 - `DOWNLOADS_HOST_PATH=/volume1/docker/downloads`
 - `REPORTING_ARCHIVE_HOST_PATH=/volume1/Bokser_Home/Operations/Reports/Reporting_Archive`
-- `STATE_HOST_PATH=/volume1/docker/bokser_app/state`
 
 Ensure `docker/.env` is populated for SOS OAuth:
 
@@ -98,7 +96,6 @@ Create production NAS directories:
 ```bash
 mkdir -p /volume1/data_lake/prod
 mkdir -p /volume1/docker/bokser_app/logs
-mkdir -p /volume1/docker/bokser_app/state
 mkdir -p /volume1/docker/downloads
 mkdir -p /volume1/Bokser_Home/Operations/Reports/Reporting_Archive
 ```
@@ -109,7 +106,6 @@ For local development on Windows, create:
 New-Item -ItemType Directory -Force C:\Users\erik\Code\data_lake\dev
 New-Item -ItemType Directory -Force C:\Users\erik\Code\bokser_app\logs
 New-Item -ItemType Directory -Force C:\Users\erik\Code\test_downloads
-New-Item -ItemType Directory -Force C:\Users\erik\Code\bokser_app\state
 ```
 
 For local reporting archive access, ensure
@@ -132,7 +128,6 @@ LAKE_HOST_PATH=/volume1/data_lake/prod
 LOGS_HOST_PATH=/volume1/docker/bokser_app/logs
 DOWNLOADS_HOST_PATH=/volume1/docker/downloads
 REPORTING_ARCHIVE_HOST_PATH=/volume1/Bokser_Home/Operations/Reports/Reporting_Archive
-STATE_HOST_PATH=/volume1/docker/bokser_app/state
 DB_NET_NAME=db_net
 DB_NET_EXTERNAL=true
 ```

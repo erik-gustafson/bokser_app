@@ -55,7 +55,6 @@ services:
       - ${LOGS_HOST_PATH}:${LOGS_ROOT}:rw
       - ${DOWNLOADS_HOST_PATH}:${DOWNLOADS_ROOT}:rw
       - ${REPORTING_ARCHIVE_HOST_PATH}:${REPORTING_ARCHIVE_ROOT}:rw
-      - ${STATE_HOST_PATH}:${STATE_ROOT}:rw
 
 networks:
   db_net:
