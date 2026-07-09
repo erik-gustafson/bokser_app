@@ -313,7 +313,7 @@ async def load_acenda_records(
                     select(model.updated_at).where(model.id == data.id)
                 )
 
-                if existing_updated_at and data.updated_at <= existing_updated_at:
+                if existing_updated_at and data.updated_at < existing_updated_at:
                     skipped += 1
                     continue
 
