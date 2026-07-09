@@ -28,6 +28,7 @@ class AcendaSettings(AppBaseSettings):
     acenda_client_secret: str = ""
     acenda_rate_limiter: float = 0.501
     acenda_poll_interval_minutes: int = 5
+    acenda_lake_load_interval_minutes: int = 5
 
     ACENDA_ENDPOINTS: ClassVar[tuple[AcendaEndpoint, ...]] = (
         AcendaEndpoint(name="new_orders", path="/order", params={"query":{"created_at":{"$gt":None}}}, state_data=("new_orders", "last_created_at"), data_type="new"),

@@ -82,7 +82,7 @@ def register_jobs(
         kwargs={
             "target_source_factory": runtime.acenda_data_factory,
             "raw_writer": runtime.raw_writer,
-            "max_concurrency": 5,
+            "max_concurrency": 15,
         },
         max_instances=1,
         coalesce=True,
@@ -92,7 +92,7 @@ def register_jobs(
     scheduler.add_job(
         load_acenda_lake_job,
         "interval",
-        minutes=5,
+        minutes=settings.acenda_lake_load_interval_minutes,
         id="load_acenda_lake_files",
         max_instances=1,
         coalesce=True,
@@ -101,6 +101,11 @@ def register_jobs(
     logger.info(
         "Acenda Sync Worker started sucessfully, polling every %s minutes",
         settings.acenda_poll_interval_minutes,
+    )
+
+    logger.info(
+        "Acenda Load Lake Worker started sucessfully, polling every %s minutes",
+        settings.acenda_lake_load_interval_minutes,
     )
 
 
