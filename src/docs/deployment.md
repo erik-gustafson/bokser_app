@@ -31,7 +31,27 @@ git remote add origin <your-origin-url>
 git remote add production bokser_admin@bokser_home_nas:~/git/bokser_app-production.git
 ```
 
-## 2) Bootstrap the Production Bare Repo + Hook on NAS
+## 2) Branch Workflow
+
+Do day-to-day work on `dev`. Treat `main` as deploy-only.
+
+Recommended flow:
+
+```bash
+git checkout dev
+git add ...
+git commit -m "describe change"
+git push
+git deploy-prod
+```
+
+Notes:
+
+- `git push` is enough on `dev` if the branch already tracks `origin/dev`.
+- `git push origin dev` is only needed the first time, or if upstream tracking is not set.
+- Avoid developing directly on `main`. `git deploy-prod` promotes `origin/dev` to `origin/main`; it does not commit local changes for you.
+
+## 3) Bootstrap the Production Bare Repo + Hook on NAS
 
 Copy this repo to the NAS, or run from a checked-out copy on the NAS, then:
 
@@ -53,7 +73,7 @@ If you change the hook template later, reinstall it with:
 install -m 755 nas-hooks/post-receive.production ~/git/bokser_app-production.git/hooks/post-receive
 ```
 
-## 3) Configure Production Hook Variables
+## 4) Configure Production Hook Variables
 
 Edit `nas-hooks/post-receive.production` as needed for your NAS layout.
 
@@ -89,7 +109,7 @@ Keep using `--env-file docker/.env` in Compose commands. Compose uses that file
 to resolve image names, ports, and bind mount paths, and `env_file: .env`
 passes runtime variables into the containers.
 
-## 4) Prepare Runtime Directories
+## 5) Prepare Runtime Directories
 
 Create production NAS directories:
 
@@ -129,7 +149,7 @@ For local reporting archive access, ensure
 `Z:\Operations\Reports\Reporting_Archive` is mounted before starting the dev
 Compose stack.
 
-## 5) Example `.env` Values
+## 6) Example `.env` Values
 
 Example production `docker/.env` values:
 
@@ -159,7 +179,7 @@ mkdir -p /volume1/docker/bokser_app/data_lake
 docker compose --env-file docker/.env -f docker/docker-compose.yml up -d --build
 ```
 
-## 6) Run With Docker Compose
+## 7) Run With Docker Compose
 
 Local Windows checkout at `C:\Users\erik\Code\bokser_app`:
 
@@ -176,7 +196,7 @@ docker compose --env-file docker/.env -f docker/docker-compose.yml up -d --build
 The Compose projects are intentionally separated as `bokser_app_dev` and
 `bokser_app_prod` so local dev and NAS production do not share Compose state.
 
-## 7) Database Migrations
+## 8) Database Migrations
 
 Create a revision from model metadata in local dev:
 
@@ -196,7 +216,7 @@ Apply migrations on the NAS with only the base Compose file:
 docker compose --env-file docker/.env -f docker/docker-compose.yml run --rm --no-deps migrate alembic -c /app/alembic.ini upgrade head
 ```
 
-## 8) Deploy Commands
+## 9) Deploy Commands
 
 Production:
 

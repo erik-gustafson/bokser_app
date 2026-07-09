@@ -571,7 +571,7 @@ class AcendaPayloadMapper:
     ### Ship Advice ###
 
     def map_ship_advice_header(self, data: dict[str, Any]) -> AcendaShipAdviceHeaders:
-        delivery = data.get("delivery_info") or {}
+        delivery = data.get("delivery_information") or data.get("delivery_info") or {}
 
         advice = AcendaShipAdviceHeaders(
             id=as_int(data.get("id")),
@@ -596,7 +596,8 @@ class AcendaPayloadMapper:
         )
 
         advice.ship_advice_items = [
-            self.map_ship_advice_item(item) for item in data.get("items", [])
+            self.map_ship_advice_item(item)
+            for item in (data.get("ship_advice_item") or data.get("items") or [])
         ]
 
         return advice
