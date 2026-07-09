@@ -82,7 +82,7 @@ def register_jobs(
         kwargs={
             "target_source_factory": runtime.acenda_data_factory,
             "raw_writer": runtime.raw_writer,
-            "max_concurrency": 15,
+            "max_concurrency": 50,
         },
         max_instances=1,
         coalesce=True,

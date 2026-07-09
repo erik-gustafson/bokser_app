@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from src.database.database import Base
 
@@ -119,8 +119,11 @@ class AcendaOrderHeaders(Base):
     )
 
     ship_advice_headers: Mapped[list["AcendaShipAdviceHeaders"]] = relationship(
+        "AcendaShipAdviceHeaders",
+        primaryjoin="foreign(AcendaShipAdviceHeaders.order_id) == AcendaOrderHeaders.id",
+        foreign_keys="AcendaShipAdviceHeaders.order_id",
+        viewonly=True,
         back_populates="order",
-        cascade="all, delete-orphan",
     )
 
 
@@ -219,6 +222,10 @@ class AcendaOrderItems(Base):
     )
 
     ship_advice_items: Mapped[list["AcendaShipAdviceItems"]] = relationship(
+        "AcendaShipAdviceItems",
+        primaryjoin="foreign(AcendaShipAdviceItems.order_item_id) == AcendaOrderItems.id",
+        foreign_keys="AcendaShipAdviceItems.order_item_id",
+        viewonly=True,
         back_populates="order_item",
     )
 
@@ -361,7 +368,7 @@ class AcendaShipAdviceHeaders(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
     order_id: Mapped[int] = mapped_column(
-        ForeignKey("acenda_order_headers.id"),
+        Integer,
         index=True,
         nullable=False,
     )
@@ -370,6 +377,10 @@ class AcendaShipAdviceHeaders(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
     order: Mapped["AcendaOrderHeaders"] = relationship(
+        "AcendaOrderHeaders",
+        primaryjoin="foreign(AcendaShipAdviceHeaders.order_id) == AcendaOrderHeaders.id",
+        foreign_keys=[order_id],
+        viewonly=True,
         back_populates="ship_advice_headers",
     )
 
@@ -420,7 +431,7 @@ class AcendaShipAdviceItems(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
     order_item_id: Mapped[int] = mapped_column(
-        ForeignKey("acenda_order_items.id"),
+        Integer,
         index=True,
         nullable=False,
     )
@@ -432,6 +443,10 @@ class AcendaShipAdviceItems(Base):
     )
 
     order_item: Mapped["AcendaOrderItems"] = relationship(
+        "AcendaOrderItems",
+        primaryjoin="foreign(AcendaShipAdviceItems.order_item_id) == AcendaOrderItems.id",
+        foreign_keys=[order_item_id],
+        viewonly=True,
         back_populates="ship_advice_items",
     )
 
