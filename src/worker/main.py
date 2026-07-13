@@ -19,7 +19,8 @@ from src.storage.raw.writer import RawPayloadWriter
 from src.worker.jobs.get_data.get_sos_data import GetSosData
 from src.worker.jobs.get_data.get_acenda_data import GetAcendaData
 from src.worker.jobs.get_data.base_get import sync_endpoints_job
-from src.worker.jobs.process_data.acenda.process_acenda_data import load_acenda_lake_job
+from src.worker.jobs.process_data.acenda.process_acenda_data import acenda_load_to_db
+from src.worker.jobs.process_data.sos.process_sos_data import sos_load_to_db
 from src.storage.states.state_store import warmup_state_files
 
 
@@ -57,6 +58,20 @@ def register_jobs(
     scheduler: AsyncIOScheduler, runtime: WorkerRuntime, logger: logging.Logger
 ) -> None:
     scheduler.add_job(
+        sos_load_to_db,
+        "interval",
+        minutes=settings.sos_lake_load_interval_minutes,
+        id="load_sos_lake_files_to_db",
+        max_instances=1,
+        coalesce=True,
+    )
+
+    logger.info(
+        "SOS Load Lake Worker started sucessfully, polling every %s minutes",
+        settings.sos_lake_load_interval_minutes,
+    )
+
+    scheduler.add_job(
         sync_endpoints_job,
         trigger="interval",
         minutes=settings.sos_poll_interval_minutes,
@@ -90,10 +105,10 @@ def register_jobs(
     )
 
     scheduler.add_job(
-        load_acenda_lake_job,
+        acenda_load_to_db,
         "interval",
         minutes=settings.acenda_lake_load_interval_minutes,
-        id="load_acenda_lake_files",
+        id="load_acenda_lake_files_to_db",
         max_instances=1,
         coalesce=True,
     )

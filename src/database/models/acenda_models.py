@@ -9,8 +9,12 @@ from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 from src.database.database import Base
 
 
+ACENDA_SCHEMA = "acenda"
+
+
 class AcendaOrderHeaders(Base):
-    __tablename__ = "acenda_order_headers"
+    __tablename__ = "order_headers"
+    __table_args__ = {"schema": ACENDA_SCHEMA}
 
     id: Mapped[int] = mapped_column(Integer, index=True, primary_key=True)
 
@@ -128,12 +132,13 @@ class AcendaOrderHeaders(Base):
 
 
 class AcendaOrderItems(Base):
-    __tablename__ = "acenda_order_items"
+    __tablename__ = "order_items"
+    __table_args__ = {"schema": ACENDA_SCHEMA}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
     order_id: Mapped[int] = mapped_column(
-        ForeignKey("acenda_order_headers.id"),
+        ForeignKey(f"{ACENDA_SCHEMA}.order_headers.id"),
         index=True,
         nullable=False,
     )
@@ -231,12 +236,13 @@ class AcendaOrderItems(Base):
 
 
 class AcendaOrderLineDiscounts(Base):
-    __tablename__ = "acenda_order_line_discounts"
+    __tablename__ = "order_line_discounts"
+    __table_args__ = {"schema": ACENDA_SCHEMA}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
     order_item_id: Mapped[int] = mapped_column(
-        ForeignKey("acenda_order_items.id"),
+        ForeignKey(f"{ACENDA_SCHEMA}.order_items.id"),
         index=True,
         nullable=False,
     )
@@ -265,12 +271,13 @@ class AcendaOrderLineDiscounts(Base):
 
 
 class AcendaOrderLineKitItems(Base):
-    __tablename__ = "acenda_order_line_kit_items"
+    __tablename__ = "order_line_kit_items"
+    __table_args__ = {"schema": ACENDA_SCHEMA}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
     order_item_id: Mapped[int] = mapped_column(
-        ForeignKey("acenda_order_items.id"),
+        ForeignKey(f"{ACENDA_SCHEMA}.order_items.id"),
         index=True,
         nullable=False,
     )
@@ -298,18 +305,19 @@ class AcendaOrderLineKitItems(Base):
 
 
 class AcendaOrderReturns(Base):
-    __tablename__ = "acenda_order_returns"
+    __tablename__ = "order_returns"
+    __table_args__ = {"schema": ACENDA_SCHEMA}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
     order_id: Mapped[int] = mapped_column(
-        ForeignKey("acenda_order_headers.id"),
+        ForeignKey(f"{ACENDA_SCHEMA}.order_headers.id"),
         index=True,
         nullable=False,
     )
 
     order_item_id: Mapped[int] = mapped_column(
-        ForeignKey("acenda_order_items.id"),
+        ForeignKey(f"{ACENDA_SCHEMA}.order_items.id"),
         index=True,
         nullable=False,
     )
@@ -363,7 +371,8 @@ class AcendaOrderReturns(Base):
 
 
 class AcendaShipAdviceHeaders(Base):
-    __tablename__ = "acenda_ship_advice_headers"
+    __tablename__ = "ship_advice_headers"
+    __table_args__ = {"schema": ACENDA_SCHEMA}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
@@ -426,7 +435,8 @@ class AcendaShipAdviceHeaders(Base):
 
 
 class AcendaShipAdviceItems(Base):
-    __tablename__ = "acenda_ship_advice_items"
+    __tablename__ = "ship_advice_items"
+    __table_args__ = {"schema": ACENDA_SCHEMA}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
@@ -437,7 +447,7 @@ class AcendaShipAdviceItems(Base):
     )
 
     ship_advice_id: Mapped[int] = mapped_column(
-        ForeignKey("acenda_ship_advice_headers.id"),
+        ForeignKey(f"{ACENDA_SCHEMA}.ship_advice_headers.id"),
         index=True,
         nullable=False,
     )

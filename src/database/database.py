@@ -4,7 +4,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import AsyncIterator, Iterator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -56,7 +56,10 @@ SessionLocal = sessionmaker(
 
 def init_db() -> None:
     if getattr(settings, "auto_create_tables", False):
-        Base.metadata.create_all(bind=sync_engine)
+        with sync_engine.begin() as connection:
+            connection.execute(text("CREATE SCHEMA IF NOT EXISTS acenda"))
+            connection.execute(text("CREATE SCHEMA IF NOT EXISTS sos"))
+            Base.metadata.create_all(bind=connection)
 
 
 def get_db() -> Iterator[Session]:

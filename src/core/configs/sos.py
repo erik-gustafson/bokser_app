@@ -32,6 +32,7 @@ class SosSettings(AppBaseSettings):
     sos_token_timeout_seconds: float = 30.0
     sos_rate_limiter: float = 0.501
     sos_poll_interval_minutes: int = 5
+    sos_lake_load_interval_minutes: int = 5
 
     SOS_ENDPOINTS: ClassVar[tuple[SOSEndpoint, ...]] = (
         SOSEndpoint(
