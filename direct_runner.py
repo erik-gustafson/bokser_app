@@ -12,7 +12,7 @@ from src.storage.states.state_store import warmup_state_files
 from src.worker.jobs.get_data.get_acenda_data import GetAcendaData
 from src.worker.jobs.get_data.get_sos_data import GetSosData
 
-from src.worker.jobs.process_data.acenda.process_acenda_data import load_acenda_lake_job
+from src.worker.jobs.process_data.acenda.process_acenda_data import acenda_load_to_db
 
 LAKE_ROOT = settings.lake_root
 
@@ -42,7 +42,7 @@ async def acenda_main() -> None:
 
 if __name__ == "__main__":
 
-    asyncio.run(load_acenda_lake_job())
+    asyncio.run(acenda_load_to_db())
 
     # data = get_json_data(
     #     path=Path(r"C:\Users\erik\Code\data_lake\dev\raw\acenda"),

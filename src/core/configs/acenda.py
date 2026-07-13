@@ -35,7 +35,6 @@ class AcendaSettings(AppBaseSettings):
         AcendaEndpoint(name="updated_orders", path="/order", params={"query":{"updated_at":{"$gt":None}}}, state_data=("updated_orders", "last_updated_at"), data_type="update"),
         AcendaEndpoint(name="new_ship_advices", path="/ship_advice", params={"query":{"created_at":{"$gt":None}}}, state_data=("new_ship_advices", "last_created_at"), data_type="new"),
         AcendaEndpoint(name="updated_ship_advices", path="/ship_advice", params={"query":{"updated_at":{"$gt":None}}}, state_data=("updated_ship_advices", "last_updated_at"), data_type="update"),
-        # AcendaEndpoint(name="query_orders", path="/search/order/"),
     )
 # fmt: on
     @classmethod

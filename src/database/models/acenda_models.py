@@ -204,7 +204,7 @@ class AcendaOrderItems(Base):
 
     quantity: Mapped[int] = mapped_column(default=0)
     quantity_fulfilled: Mapped[int] = mapped_column(default=0)
-    quantity_cancelled: Mapped[int] = mapped_column(default=0)
+    quantity_canceled: Mapped[int] = mapped_column(default=0)
     quantity_routed: Mapped[int] = mapped_column(default=0)
 
     order: Mapped["AcendaOrderHeaders"] = relationship(
