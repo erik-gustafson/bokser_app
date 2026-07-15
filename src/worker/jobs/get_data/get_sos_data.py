@@ -73,8 +73,12 @@ class GetSosData:
             await self.open()
 
         try:
+            endpoint_params = settings.get_sos_endpoint_params(
+                file_path=self.state_file, endpoint=endpoint
+            )
             return await self._get_raw_sos_data_with_open_client(
                 endpoint=endpoint,
+                endpoint_params=endpoint_params,
                 max_results=max_results,
                 archived=archived,
                 max_concurrency=max_concurrency,
@@ -87,14 +91,13 @@ class GetSosData:
         self,
         *,
         endpoint: SOSEndpoint,
+        endpoint_params: dict,
         max_results: int,
         archived: str,
         max_concurrency: int,
     ) -> list[dict[str, Any]]:
         path = endpoint.path
-        endpoint_params = settings.get_sos_endpoint_params(
-            file_path=self.state_file, endpoint=endpoint
-        )
+
         base_params = {
             **endpoint_params,
             "maxresults": max_results,
@@ -107,8 +110,7 @@ class GetSosData:
             path_or_url=path,
             params=base_params,
         )
-        if first_response.status_code != 200:
-            breakpoint
+
         first_response.raise_for_status()
 
         first_payload = first_response.json()
@@ -132,8 +134,6 @@ class GetSosData:
                 page_params = {**base_params, "start": start_cursor}
 
                 response = await client.get(path_or_url=path, params=page_params)
-                if response.status_code != 200:
-                    breakpoint
                 response.raise_for_status()
                 page_records = self._extract_records(
                     response.json(),
@@ -143,7 +143,7 @@ class GetSosData:
 
         tasks = [
             asyncio.create_task(fetch_page(page_idx))
-            for page_idx in range(2, total_pages)
+            for page_idx in range(1, total_pages)
         ]
 
         for task in asyncio.as_completed(tasks):

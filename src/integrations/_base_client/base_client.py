@@ -152,6 +152,14 @@ class AuthenticatedHttpClient:
             headers=headers,
         )
 
+    async def delete(
+        self, path_or_url: str, *, json_data: Any | None = None
+    ) -> httpx.Response:
+        await self.rate_limiter.wait()
+        return await self._request(
+            "DELETE", path_or_url, json_data=json_data, timeout=480
+        )
+
     async def _request(
         self,
         method: str,
@@ -161,6 +169,7 @@ class AuthenticatedHttpClient:
         json_data: Any | None = None,
         data: Mapping[str, Any] | None = None,
         headers: Mapping[str, str] | None = None,
+        timeout: int | None = None,
     ) -> httpx.Response:
         url = self._build_url(path_or_url)
         attempt = 0
@@ -184,6 +193,7 @@ class AuthenticatedHttpClient:
                     json=json_data,
                     data=data,
                     headers=request_headers,
+                    timeout=timeout,
                 )
             except (
                 httpx.TimeoutException,

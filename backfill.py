@@ -9,6 +9,7 @@ from pathlib import Path, PureWindowsPath
 from typing import Any
 
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.engine import CursorResult
 
 from src.database.database import async_session
 from src.database.models.data_lake_models import DataLakeFile
@@ -168,6 +169,11 @@ async def queue_lake_files_from_path(
                     )
 
                     result = await session.execute(stmt)
+
+                    if not isinstance(result, CursorResult):
+                        raise TypeError(
+                            "Expected a CursorResult from the DML statement"
+                        )
 
                     if result.rowcount == 1:
                         queued += 1

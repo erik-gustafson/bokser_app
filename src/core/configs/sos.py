@@ -30,7 +30,7 @@ class SosSettings(AppBaseSettings):
     sos_authorization_code: str = ""
     sos_token_refresh_skew_seconds: int = 60
     sos_token_timeout_seconds: float = 30.0
-    sos_rate_limiter: float = 0.501
+    sos_rate_limiter: float = .501
     sos_poll_interval_minutes: int = 5
     sos_lake_load_interval_minutes: int = 5
 
