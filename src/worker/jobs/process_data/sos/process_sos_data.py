@@ -405,12 +405,12 @@ async def load_sos_records(
                 )
                 incoming_sync_token = data.sync_token or 0
 
-                if (
-                    existing_sync_token is not None
-                    and incoming_sync_token <= existing_sync_token
-                ):
-                    skipped += 1
-                    continue
+                # if (
+                #     existing_sync_token is not None
+                #     and incoming_sync_token <= existing_sync_token
+                # ):
+                #     skipped += 1
+                #     continue
 
                 await session.merge(data)
 
