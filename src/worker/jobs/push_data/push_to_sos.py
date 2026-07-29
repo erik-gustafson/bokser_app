@@ -2,114 +2,657 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from sqlalchemy import select, func, cast, Text
-from sqlalchemy.orm import selectinload
+import json
+import hashlib
+from datetime import datetime, timezone
+from typing import Optional, Any, Sequence
+from sqlalchemy import select, func, cast, Text, BigInteger
+from sqlalchemy.orm import contains_eager
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import insert
+
+from src.integrations.sos_client import SOSClient
 
 from src.database.database import async_session
 from src.database.models import (
     AcendaOrderHeaders,
     AcendaOrderItems,
     SosSalesOrderHeader,
-    SosSalesOrderLine,
     SosItem,
+    SosSalesOrderSync,
+    ErrorLog,
 )
 
-from .sos_payload_mapper import SosSalesOrderPayloadMapper
+from .sos_payload_mapper import (
+    SosSalesOrderPayloadMapper,
+    SosSalesOrderCreate,
+    SosSalesOrderLineCreate,
+)
+
+from .sos_payload_mapper import SosItemsForLoad
+
+from src.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 
-async def load_sos_items_by_sku(skus: list[str | None]):
-    if not skus:
-        return
-
-    async with async_session() as session:
-
-        stmt = select(SosItem.id).where(SosItem.sku.in_(skus))
-
-        return list((await session.scalars(stmt)).all())
+class SosPostError(Exception):
+    pass
 
 
 class AcendaOrderPush:
+    SOURCE = "acenda"
+    LOOKBACK_DAYS = 1
 
-    def __init__(self):
-        self.sos_mapper = SosSalesOrderPayloadMapper()
+    def __init__(self) -> None:
+        self.sos_items = SosItemsForLoad()
+        self.sos_mapper = SosSalesOrderPayloadMapper(self.sos_items)
+        self.sos_so_sync = SosSalesOrderSyncService()
 
-    async def send_to_sos(self):
+    async def send_to_sos(self) -> None:
+        """
+        Load unsynced Acenda order lines, map them to SOS payloads,
+        and create pending SOS sync records.
+
+        Mapping errors are logged per order without stopping the
+        remaining orders.
+        """
 
         open_orders = await self.load_open_acenda_db_orders()
 
-        if open_orders:
-            tasks = []
-            async with asyncio.TaskGroup() as tg:
-                for order in open_orders:
-                    task = tg.create_task(self.safe_map_order(order))
-                    tasks.append(task)
+        if not open_orders:
+            logger.info("No unsynced Acenda order lines found")
+            return
 
-            results = [task.result() for task in tasks]
+        skus = self._get_order_skus(open_orders)
 
-            for result in results:
-                if isinstance(result, Exception):
-                    print(f"Task {result} returned error: {result}")
-                else:
-                    print(f"Task {result} returned data: {result}")
+        if skus:
+            await self.sos_items.load_sos_items_by_sku(skus=skus)
 
-    async def load_open_acenda_db_orders(self) -> list[AcendaOrderHeaders]:
+        mapped_orders, error_logs = self._map_orders(open_orders)
+
+        if error_logs:
+            async with async_session() as session:
+                async with session.begin():
+                    if error_logs:
+                        session.add_all(error_logs)
+
+        if not mapped_orders:
+            logger.warning(
+                "No Acenda orders were successfully mapped",
+                extra={"open_order_count": len(open_orders)},
+            )
+            return
+
+        # sync_rows = self.sos_so_sync._build_sync_rows(
+        #     orders=mapped_orders, source=self.SOURCE
+        # )
+
+        # if not sync_rows:
+        #     logger.warning(
+        #         "Mapped Acenda orders did not contain any lines",
+        #         extra={"mapped_order_count": len(mapped_orders)},
+        #     )
+        #     return
 
         async with async_session() as session:
-            sos_order_exists = (
-                select(SosSalesOrderHeader.id)
+            async with session.begin():
+                #     await self.sos_so_sync._create_sync_records(
+                #         session=session,
+                #         rows=sync_rows,
+                #     )
+
+                tasks = [
+                    self._post_to_sos_and_log(session=session, mapped_order=mp)
+                    for mp in mapped_orders
+                ]
+
+                results = await asyncio.gather(*tasks)
+                for result, error in results:
+                    if result:
+                        print("YAY")
+                    if error:
+                        print("Boo")
+
+    async def _post_to_sos_and_log(
+        self, session: AsyncSession, mapped_order: SosSalesOrderCreate
+    ):
+
+        try:
+            result = await self.sos_so_sync.post_and_record(
+                session=session,
+                mapped_order=mapped_order,
+                sos_prefix=settings.sos_default_mkt_prefix,
+                source="acenda",
+            )
+            return result, None
+
+        except Exception as exc:
+            logger.exception(
+                "Failed to POST Acenda order to SOS",
+                extra={
+                    "order_number": mapped_order.number,
+                    "customer_po": mapped_order.customer_po,
+                },
+            )
+
+            error = ErrorLog(
+                error_type="SOS POST Failure",
+                message=str(exc.args[0]),
+                context=exc.args[1].to_json(),
+            )
+
+            return None, error
+
+    async def load_open_acenda_db_orders(
+        self,
+    ) -> list[AcendaOrderHeaders]:
+        """
+        Return Acenda order headers containing at least one unsynced line.
+
+        Each header's ``items`` relationship contains only the lines that
+        do not already have a matching SOS sync record.
+        """
+        async with async_session() as session:
+            sos_order_sync_exists = (
+                select(SosSalesOrderSync.id)
                 .where(
-                    cast(SosSalesOrderHeader.customer_po, Text)
-                    == cast(AcendaOrderHeaders.id, Text)
+                    SosSalesOrderSync.source == self.SOURCE,
+                    cast(
+                        SosSalesOrderSync.source_line_key,
+                        Text,
+                    )
+                    == cast(AcendaOrderItems.id, Text),
                 )
+                .correlate(AcendaOrderItems)
                 .exists()
             )
 
             stmt = (
                 select(AcendaOrderHeaders)
-                .options(selectinload(AcendaOrderHeaders.items))
-                .where(
-                    AcendaOrderHeaders.created_at >= func.current_date() - 90,
-                    ~sos_order_exists,
+                .join(AcendaOrderHeaders.items)
+                .options(
+                    contains_eager(AcendaOrderHeaders.items),
                 )
-                .order_by(AcendaOrderHeaders.id.asc())
+                .where(
+                    AcendaOrderHeaders.created_at
+                    >= func.current_date() - self.LOOKBACK_DAYS,
+                    ~sos_order_sync_exists,
+                )
+                .order_by(
+                    AcendaOrderHeaders.id.asc(),
+                    AcendaOrderItems.id.asc(),
+                )
             )
 
-            return list((await session.scalars(stmt)).all())
+            result = await session.execute(stmt)
 
-    async def safe_map_order(self, order):
+            return list(result.unique().scalars().all())
+
+    def _get_order_skus(
+        self,
+        orders: list[AcendaOrderHeaders],
+    ) -> tuple[str, ...]:
+        """
+        Return the unique, non-null SKUs needed to map the orders.
+        """
+        return tuple(
+            {
+                item.sku
+                for order in orders
+                for item in order.items
+                if item.sku is not None
+            }
+        )
+
+    def _map_orders(
+        self,
+        orders: list[AcendaOrderHeaders],
+    ) -> tuple[list[SosSalesOrderCreate], list[ErrorLog]]:
+        """
+        Map all orders while isolating failures to individual orders.
+        """
+        mapped_orders: list[SosSalesOrderCreate] = []
+        error_logs: list[ErrorLog] = []
+
+        for order in orders:
+            mapped_order, error_log = self._map_order(order)
+
+            if mapped_order is not None:
+                mapped_orders.append(mapped_order)
+
+            if error_log is not None:
+                error_logs.append(error_log)
+
+        return mapped_orders, error_logs
+
+    def _map_order(
+        self,
+        order: AcendaOrderHeaders,
+    ) -> tuple[SosSalesOrderCreate | None, ErrorLog | None]:
         try:
-            return await self.map_order(order)
-        except Exception as e:
-            return e
+            payload = self.sos_mapper.map_acenda_order(order)
+            return payload, None
 
-    async def map_order(self, order: AcendaOrderHeaders):
-
-        # Name: (Acenda Id, Sos ID)
-        sales_channel_dict = {
-            "Target Plus US Marketplace": (1, 15),
-            "Macys": (2, 49),
-            "Kohls": (3, 66),
-            "bokserhome.myshopify.com": (4, 12),
-            "Overstock": (5, 37),
-            "Walmart US": (6, 206),
-            "Wayfair": (7, 135),
-        }
-
-        if order.sales_channel_name:
-            channel_id = sales_channel_dict.get(order.sales_channel_name, (None, None))[
-                1
-            ]
-
-        else:
-            raise ValueError(
-                f"No Sales Channel Name Provided for Acenda Order {order.id}"
+        except Exception as exc:
+            logger.exception(
+                "Failed to map Acenda order",
+                extra={"order_id": order.id},
             )
 
-        skus = list({item.sku for item in order.items})
+            error = ErrorLog(
+                error_type="SOS Item Missing",
+                message=str(exc.args[0]),
+                context=exc.args[1].to_json(),
+            )
 
-        sos_items = await load_sos_items_by_sku(skus)
-        if sos_items and len(sos_items) < len(skus):
-            logger.error(f"No SOS Sku Match for {skus}")
-        # return await self.sos_mapper.map_acenda_order(order)
+            return None, error
+
+
+class SosSalesOrderSyncService:
+    """SosSalesOrderSyncTasks takes database records for Rithum and Guest Supply and creates SOS Sales Orders"""
+
+    def __init__(self):
+        self.sos_client = SOSClient()
+
+    async def post_and_record(
+        self,
+        session: AsyncSession,
+        mapped_order: SosSalesOrderCreate,
+        sos_prefix: str,
+        source: str,
+    ):
+
+        duplicate_msg = "Duplicate sales order number. Please choose another number."
+
+        def _is_duplicate_order_number(resp) -> bool:
+            if resp.status_code != 400:
+                return False
+            try:
+                msg = (resp.json() or {}).get("message") or ""
+            except Exception:
+                msg = resp.text or ""
+            return msg.strip() == duplicate_msg
+
+        # try:
+        #     current_number = await self._next_order_number(
+        #         session, prefix=spec.order_number_prefix
+        #     )
+        # except Exception as exc:
+        #     logger.error(
+        #         "Failed to fetch initial SOS order number, falling back to timestamp: %s",
+        #         exc,
+        #     )
+        #     current_number = await self._next_order_number(
+        #         session,
+        #         prefix=spec.order_number_prefix,
+        #         use_timestamp=True,
+        #     )
+
+        payload = mapped_order.to_payload()
+
+        current_number = str(payload["number"])
+
+        attempts = 0
+        resp = None
+        success = False
+
+        while attempts < 20:
+            payload["number"] = f"{sos_prefix}-{current_number}"
+            resp = await self.sos_client.post(
+                path_or_url="/salesorder", json_data=payload
+            )
+
+            if resp.status_code == 200:
+                data = (resp.json() or {}).get("data") or {}
+                posted_rows = [line for line in mapped_order.lines]
+                await self._record_success(
+                    session,
+                    source,
+                    mapped_order.number,
+                    posted_rows,
+                    data,
+                )
+                success = True
+                current_number = await self._next_order_number(
+                    session,
+                    prefix=sos_prefix,
+                    bump=True,
+                    current_number=current_number,
+                )
+                break
+
+            if _is_duplicate_order_number(resp):
+                attempts += 1
+                current_number = await self._next_order_number(
+                    session,
+                    prefix=sos_prefix,
+                    bump=True,
+                    current_number=current_number,
+                )
+                continue
+
+            break  # non-duplicate failure
+
+        if (
+            not success
+            and attempts >= 20
+            and resp is not None
+            and _is_duplicate_order_number(resp)
+        ):
+            fallback_number = await self._next_order_number(
+                session,
+                prefix=sos_prefix,
+                use_timestamp=True,
+            )
+            payload["number"] = f"{sos_prefix}-{fallback_number}"
+
+            resp = await self.sos_client.post(
+                path_or_url="/salesorder", json_data=payload
+            )
+
+            if resp.status_code == 200:
+                data = (resp.json() or {}).get("data") or {}
+                posted_rows = [line for line in mapped_order.lines]
+                await self._record_success(
+                    session,
+                    source,
+                    mapped_order.number,
+                    posted_rows,
+                    data,
+                )
+                success = True
+                current_number = await self._next_order_number(
+                    session,
+                    prefix=sos_prefix,
+                    bump=True,
+                    current_number=fallback_number,
+                )
+
+        if not success:
+            try:
+                err_body = resp.json() if resp is not None else {}
+            except Exception:
+                err_body = {
+                    "status_code": resp.status_code if resp is not None else None,
+                    "text": resp.text if resp is not None else "",
+                }
+
+            await self._record_failure(
+                session,
+                source,
+                mapped_order.number,
+                [line for line in mapped_order.lines],
+                err_body,
+            )
+
+            raise SosPostError("Sos Sales Order Post Failure", mapped_order)
+
+        return success
+
+    async def _record_success(
+        self,
+        session: AsyncSession,
+        source: str,
+        sync_header_key: str,
+        rows: list[SosSalesOrderLineCreate],
+        sos_data: dict[str, Any],
+    ) -> None:
+        sos_order_id = sos_data.get("id")
+        line_map = {
+            str(line.get("lineNumber")): line
+            for line in (sos_data.get("lines") or [])
+            if line.get("lineNumber") is not None
+        }
+        now = datetime.now(timezone.utc)
+
+        for row in rows:
+            line_key = row.id
+            sos_line = (
+                line_map.get(str(row.line_number))
+                if row.line_number is not None
+                else None
+            )
+
+            sync_row = await self._get_or_create_sync(
+                session,
+                source=source,
+                header_key=sync_header_key,
+                line_key=line_key,
+                default_status="pending",
+            )
+
+            sync_row.status = "sent"
+            sync_row.attempts = (sync_row.attempts or 0) + 1
+            sync_row.last_error = None
+            sync_row.sos_order_id = sos_order_id
+            sync_row.sos_line_id = sos_line.get("id") if sos_line else None
+            sync_row.last_sent_at = now
+
+    async def _record_failure(
+        self,
+        session: AsyncSession,
+        source: str,
+        sync_header_key: str,
+        rows: list[SosSalesOrderLineCreate],
+        error: dict[str, Any],
+    ) -> None:
+
+        for row in rows:
+            line_key = row.id
+            sync_row = await self._get_or_create_sync(
+                session,
+                source=source,
+                header_key=sync_header_key,
+                line_key=line_key,
+                default_status="pending",
+            )
+            sync_row.status = "failed"
+            sync_row.attempts = (sync_row.attempts or 0) + 1
+            sync_row.last_error = json.dumps(error)
+
+    async def _upsert_sync_rows(
+        self, session: AsyncSession, rows: list[SosSalesOrderSync]
+    ) -> None:
+        for row in rows:
+            existing = await self._find_sync_row(
+                session,
+                source=row.source,
+                line_key=row.source_line_key,
+            )
+            if existing:
+                existing.status = row.status
+                existing.last_error = row.last_error
+                if row.payload_hash:
+                    existing.payload_hash = row.payload_hash
+            else:
+                session.add(row)
+
+    async def _find_sync_row(
+        self,
+        session: AsyncSession,
+        *,
+        source: str,
+        line_key: str,
+    ) -> SosSalesOrderSync | None:
+        return (
+            (
+                await session.execute(
+                    select(SosSalesOrderSync)
+                    .where(
+                        SosSalesOrderSync.source == source,
+                        SosSalesOrderSync.source_line_key == line_key,
+                    )
+                    .order_by(SosSalesOrderSync.id.desc())
+                    .limit(1)
+                )
+            )
+            .scalars()
+            .first()
+        )
+
+    async def _next_order_number(
+        self,
+        session: AsyncSession,
+        prefix: str,
+        bump: bool = False,
+        current_number: Optional[str] = None,
+        use_timestamp: bool = False,
+    ) -> str:
+        """
+        Get the next API order number.
+        - If current_number is provided, increment it when bump=True (used for retries and subsequent orders).
+        - Otherwise pull the max from SOS headers; if none exists or use_timestamp=True, start from a timestamp base.
+        """
+
+        if current_number is not None:
+            if prefix == settings.sos_default_mkt_prefix:
+                return current_number + (".1" if bump else "")
+            return str(int(current_number) + (1 if bump else 0))
+
+        last_num = None
+        if not use_timestamp:
+            last_num = (
+                await session.execute(
+                    select(
+                        func.max(
+                            func.cast(
+                                func.replace(
+                                    SosSalesOrderHeader.number, f"{prefix}-", ""
+                                ),
+                                BigInteger,
+                            )
+                        )
+                    ).where(
+                        SosSalesOrderHeader.number.like(f"{prefix}-%"),
+                    )
+                )
+            ).scalar_one_or_none()
+
+        base_num = (
+            int(last_num)
+            if last_num is not None
+            else int(datetime.utcnow().strftime("%y%m%d%H%M"))
+        )
+
+        next_num = base_num + 1
+        if bump:
+            next_num += 1
+        return str(next_num)
+
+    # def _pick_stage(
+    #     self, subtotal: float, source: str | None
+    # ) -> tuple[int, Optional[str]]:
+    #     return _default_stage_selector(subtotal, source)
+
+    def _hash_payload(self, payload: dict[str, Any]) -> str:
+        as_text = json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        )
+        return hashlib.sha256(as_text.encode("utf-8")).hexdigest()
+
+    async def _get_or_create_sync(
+        self,
+        session: AsyncSession,
+        *,
+        source: str,
+        header_key: str,
+        line_key: str,
+        default_status: str,
+    ) -> SosSalesOrderSync:
+        existing = await self._find_sync_row(
+            session,
+            source=source,
+            line_key=line_key,
+        )
+        if existing:
+            return existing
+
+        sync_row = self._build_sync_row(
+            source=source,
+            header_key=header_key,
+            line_key=line_key,
+            status=default_status,
+        )
+        session.add(sync_row)
+        return sync_row
+
+    def _build_sync_row(
+        self,
+        source: str,
+        header_key: str,
+        line_key: str,
+        status: str,
+        payload_hash: str | None = None,
+        error: Optional[str] = None,
+    ) -> SosSalesOrderSync:
+        return SosSalesOrderSync(
+            source=source,
+            source_header_key=header_key,
+            source_line_key=line_key,
+            payload_hash=payload_hash,
+            status=status,
+            last_error=error,
+        )
+
+    ###
+
+    # def _build_sync_rows(
+    #     self,
+    #     orders: list[SosSalesOrderCreate] | SosSalesOrderCreate,
+    #     source,
+    # ) -> list[dict[str, Any]]:
+    #     """
+    #     Build the rows needed for the SOS sales-order sync table.
+    #     """
+    #     if isinstance(orders, list):
+    #         return [
+    #             {
+    #                 "source": source,
+    #                 "source_header_key": str(order.number),
+    #                 "source_line_key": str(line.id),
+    #                 "payload_hash": self._hash_payload(line.to_payload()),
+    #                 "status": "pending",
+    #             }
+    #             for order in orders
+    #             for line in order.lines
+    #         ]
+
+    #     return [
+    #         {
+    #             "source": source,
+    #             "source_header_key": str(orders.number),
+    #             "source_line_key": str(line.id),
+    #             "payload_hash": self._hash_payload(line.to_payload()),
+    #             "status": "pending",
+    #         }
+    #         for line in orders.lines
+    #     ]
+
+    # async def _create_sync_records(
+    #     self,
+    #     *,
+    #     session,
+    #     rows: list[dict[str, Any]],
+    # ) -> None:
+    #     """
+    #     Insert sync records in one statement.
+
+    #     Existing records are ignored based on the table's unique
+    #     constraint for source and source line key.
+    #     """
+    #     if not rows:
+    #         return
+
+    #     stmt = (
+    #         insert(SosSalesOrderSync)
+    #         .values(rows)
+    #         .on_conflict_do_nothing(
+    #             constraint="ux_sos_order_sync_source_line",
+    #         )
+    #     )
+
+    #     await session.execute(stmt)

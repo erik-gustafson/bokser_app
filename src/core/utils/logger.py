@@ -9,16 +9,14 @@ FALLBACK_LOG_DIR = os.path.join(tempfile.gettempdir(), "bokser_app_logs")
 
 def _build_file_handler(filepath: str) -> TimedRotatingFileHandler:
     handler = TimedRotatingFileHandler(
-        filepath,
-        when="midnight",
-        backupCount=14,
-        encoding="utf-8"
+        filepath, when="midnight", backupCount=14, encoding="utf-8"
     )
     formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
     handler.setFormatter(formatter)
     return handler
+
 
 def get_file_handler(filename: str):
     log_directories = [DEFAULT_LOG_DIR, FALLBACK_LOG_DIR]
@@ -36,6 +34,7 @@ def get_file_handler(filename: str):
         raise last_error
     raise RuntimeError("No writable log directory available")
 
+
 def setup_logging(log_file: str):
     """
     log_file -> "api.log" OR "worker.log" OR "migrate.log"
@@ -49,9 +48,9 @@ def setup_logging(log_file: str):
 
     # Add console handler for docker logs
     console = logging.StreamHandler()
-    console.setFormatter(logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    ))
+    console.setFormatter(
+        logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    )
     logger.addHandler(console)
 
     # Prefer file logging, but keep the process alive if the mounted log

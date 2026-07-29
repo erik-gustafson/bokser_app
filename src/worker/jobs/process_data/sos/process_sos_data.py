@@ -14,7 +14,7 @@ from sqlalchemy.orm import DeclarativeBase
 
 from src.database.database import async_session
 from src.database.models.data_lake_models import DataLakeFile
-from src.database.models.sos import (
+from src.database.models.sos_models import (
     SosInvoiceCustomField,
     SosInvoiceHeader,
     SosInvoiceHeaderLinkedTransactions,
@@ -44,11 +44,7 @@ from src.database.models.sos import (
 logger = logging.getLogger(__name__)
 
 PayloadType = Literal[
-    "sales_order",
-    "invoice",
-    "shipment",
-    "item_receipt",
-    "item",
+    "sales_order", "invoice", "shipment", "item_receipt", "item", "purchase_order"
 ]
 
 SosRootRecord: TypeAlias = (
@@ -65,6 +61,7 @@ SOS_ENTITY_TYPES: dict[str, PayloadType] = {
     "updated_shipments": "shipment",
     "updated_item_receipts": "item_receipt",
     "updated_items": "item",
+    "updated_purchase_orders": "purchase_order",
 }
 
 PAYLOAD_MODELS: dict[PayloadType, type[SosRootRecord]] = {

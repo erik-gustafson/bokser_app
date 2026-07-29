@@ -1,14 +1,57 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any
-
+from datetime import datetime, timezone, timedelta
+from typing import Any, Sequence
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import inspect as sqlalchemy_inspect
+from sqlalchemy import inspect, select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.base import NO_VALUE
 
-from src.database.models.acenda_models import AcendaOrderHeaders, AcendaOrderItems
-from src.database.models.sos import SosSalesOrderHeader, SosSalesOrderLine
+from src.core.config import settings
+
+from src.database.database import async_session
+from src.database.models import AcendaOrderHeaders, AcendaOrderItems, SosItem
+
+ACENDA_SALES_CHANNEL_TO_SOS_IDS = {
+    "Target Plus US Marketplace": {"acenda": 1, "sos": 15},
+    "Macys": {"acenda": 2, "sos": 49},
+    "Kohls": {"acenda": 3, "sos": 66},
+    "bokserhome.myshopify.com": {"acenda": 4, "sos": 12},
+    "Overstock": {"acenda": 5, "sos": 37},
+    "Walmart US": {"acenda": 6, "sos": 206},
+    "Wayfair": {"acenda": 7, "sos": 135},
+}
+
+
+def add_time(**kwargs):
+    return datetime.now(timezone.utc) + timedelta(**kwargs)
+
+
+class SosItemsForLoad:
+
+    def __init__(self):
+        self.item_dict: dict[str, SosItem] = {}
+
+    async def load_sos_items_by_sku(
+        self,
+        skus: Sequence[str | None],
+    ) -> None:
+        if not skus:
+            return
+
+        async with async_session() as session:
+            stmt = (
+                select(SosItem)
+                .options(selectinload(SosItem.uoms))
+                .where(SosItem.sku.in_(skus))
+            )
+
+            items = list((await session.scalars(stmt)).all())
+
+        self.item_dict = {str(item.sku): item for item in items if item.sku is not None}
+
+    def clear_dict(self):
+        self.item_dict.clear()
 
 
 class _SosPayloadModel(BaseModel):
@@ -47,59 +90,122 @@ class SosTransactionAddress(_SosPayloadModel):
 
 
 class SosSalesOrderLineCreate(_SosPayloadModel):
-    item: SosReference
+    id: str
+    line_number: int = Field(
+        ge=1,
+        serialization_alias="lineNumber",
+    )
+    item: dict[str, int | str]
+    sos_class: dict[str, int | str] = Field(serialization_alias="class")
     description: str | None = None
     quantity: float = Field(gt=0)
+    uom: dict[str, int | str]
     unit_price: float | None = Field(default=None, serialization_alias="unitprice")
-
-
-class SosSalesOrderCreate(_SosPayloadModel):
-    number: str | None = None
-    date: datetime | None = None
-    customer: SosReference
-    location: SosReference | None = None
-    customer_po: str | None = Field(default=None, serialization_alias="customerPO")
-    comment: str | None = None
-    billing: SosTransactionAddress | None = None
-    shipping: SosTransactionAddress | None = None
-    lines: list[SosSalesOrderLineCreate] = Field(min_length=1)
+    amount: float
+    due_date: str  # <- Use headers expected delviery date or today + 5?
+    tax: dict[str, bool]  # <- if tax amount on order is 0 then false else true
 
     def to_payload(self) -> dict[str, Any]:
-        """Return the JSON-safe dictionary expected by ``SOSClient.post``."""
+        """Return the JSON-safe dictionary."""
 
         return self.model_dump(mode="json", by_alias=True, exclude_none=True)
 
 
-class SosOrderReferences(_SosPayloadModel):
-    """SOS identifiers resolved by the caller for an Acenda order."""
+class SosSalesOrderCreate(_SosPayloadModel):
+    number: str
+    date: str | None = None
+    customer: dict[str, int]
+    location: dict[str, int | str] | None = None
+    customer_po: str | None = Field(default=None, serialization_alias="customerPO")
+    comment: str | None = None
+    billing: SosTransactionAddress | None = None
+    shipping: SosTransactionAddress | None = None
 
-    customer_id: int = Field(gt=0)
-    item_ids: dict[int, int]
-    location_id: int | None = Field(default=None, gt=0)
+    order_stage: dict[str, int | str] = Field(serialization_alias="orderStage")
+    channel: dict[str, int | str]
+    terms: dict[str, int | str]
+    shipping_amount: float | None = Field(
+        default=None, serialization_alias="shippingAmount"
+    )
+    discount_amount: float | None = Field(
+        default=None, serialization_alias="discountAmount"
+    )
+    tax_amount: float | None = Field(default=None, serialization_alias="taxAmount")
+
+    lines: list[SosSalesOrderLineCreate] = Field(min_length=1)
+
+    def to_payload(self) -> dict[str, Any]:
+        """Return the JSON-safe dictionary."""
+
+        return self.model_dump(
+            mode="json",
+            by_alias=True,
+            exclude_none=True,
+            exclude={
+                "lines": {
+                    "__all__": {"id"},
+                }
+            },
+        )
 
 
 class SosSalesOrderPayloadMapper:
+
+    def __init__(self, sos_items: SosItemsForLoad) -> None:
+        self.sos_items = sos_items
+
     def map_acenda_order(
         self,
         order: AcendaOrderHeaders,
-        references: SosOrderReferences,
     ) -> SosSalesOrderCreate:
+
         items = self._loaded_collection(order, "items", source="Acenda Order")
-        lines = [self._map_acenda_line(item, references.item_ids) for item in items]
+        sorted_items = sorted(items, key=lambda item: item.id)
+        lines = [
+            self._map_acenda_line(
+                line=item,
+                line_number=line_number,
+                sos_items=self.sos_items,
+            )
+            for line_number, item in enumerate(sorted_items, start=1)
+        ]
+
+        shipping_amount = sum([x.total_handling_price for x in order.items])
+        discount_amount = sum([x.total_item_discount for x in order.items])
+        tax_amount = sum([x.total_item_tax for x in order.items])
+
+        if order.sales_channel_name:
+            try:
+                sales_channel_customer_dict = ACENDA_SALES_CHANNEL_TO_SOS_IDS[
+                    order.sales_channel_name
+                ]
+            except:
+                raise KeyError(
+                    f"Sales channel name provided for Acenda order {order.id} not valid!"
+                )
+        else:
+            raise ValueError(
+                f"No sales shannel name provided for Acenda order {order.id}!"
+            )
+
+        sos_customer_dict = {"id": sales_channel_customer_dict["sos"]}
+        order_stage = self._set_order_stage(order.sales_channel_id)
 
         return SosSalesOrderCreate(
             number=str(order.order_number),
-            date=order.ordered_at,
-            customer=SosReference(id=references.customer_id),
-            location=(
-                SosReference(id=references.location_id)
-                if references.location_id is not None
-                else None
-            ),
+            date=settings.sos_timestamp_format(order.ordered_at),
+            customer=sos_customer_dict,
+            location=settings.sos_ksp_location_dict,
             customer_po=order.purchase_order,
             comment=self._acenda_comment(order.fields),
             billing=self._acenda_address(order, "bill"),
             shipping=self._acenda_address(order, "ship"),
+            order_stage=order_stage,
+            channel=settings.sos_dtc_channel_dict,
+            terms=settings.sos_default_terms_dict,
+            shipping_amount=shipping_amount,
+            discount_amount=discount_amount,
+            tax_amount=tax_amount,
             lines=lines,
         )
 
@@ -110,7 +216,7 @@ class SosSalesOrderPayloadMapper:
         *,
         source: str,
     ) -> list[Any]:
-        state = sqlalchemy_inspect(instance)
+        state = inspect(instance)
         relationship = state.attrs[relationship_name]
         if relationship.loaded_value is NO_VALUE:
             identity = getattr(instance, "id", None)
@@ -122,20 +228,43 @@ class SosSalesOrderPayloadMapper:
 
     @staticmethod
     def _map_acenda_line(
-        line: AcendaOrderItems,
-        item_ids: dict[int, int],
+        line: AcendaOrderItems, line_number: int, sos_items: SosItemsForLoad
     ) -> SosSalesOrderLineCreate:
-        sos_item_id = item_ids.get(line.id)
-        if sos_item_id is None or sos_item_id <= 0:
+        sos_item = sos_items.item_dict.get(line.sku)
+
+        if sos_item is None:
             raise ValueError(
-                f"Acenda order item {line.id!r} has no valid SOS item mapping"
+                f"Acenda order item {line.id!r} has no valid SOS item mapping to {line.sku!r}",
+                line,
             )
 
+        item_id_dict = {"id": sos_item.id} if sos_item.id else {}
+        item_name_dict = {"name": sos_item.name} if sos_item.name else {}
+
+        due_date = (
+            settings.sos_timestamp_format(line.expected_delivery_date)
+            if line.expected_delivery_date
+            else settings.sos_timestamp_format(add_time(days=7))
+        )
+
+        taxable = (
+            settings.sos_item_taxable_dict
+            if line.total_item_tax
+            else settings.sos_item_non_taxable_dict
+        )
+
         return SosSalesOrderLineCreate(
-            item=SosReference(id=sos_item_id),
-            description=line.product_name,
+            id=str(line.id),
+            line_number=line_number,
+            item=item_id_dict | item_name_dict,
+            sos_class=settings.sos_dtc_class_dict,
+            description=sos_item.description,
             quantity=line.quantity,
             unit_price=line.unit_price,
+            uom=settings.sos_uom_ea_dict,
+            amount=line.total_price,
+            due_date=due_date,
+            tax=taxable,
         )
 
     @classmethod
@@ -201,9 +330,15 @@ class SosSalesOrderPayloadMapper:
         comment = fields.get("comment")
         return comment if isinstance(comment, str) else None
 
+    @staticmethod
+    def _set_order_stage(customer_id: int) -> dict[str, int | str]:
+        if customer_id in settings.acenda_send_to_wms.values():
+            return settings.sos_ready_to_send_order_stage_dict
+        else:
+            return settings.sos_marketplace_order_stage_dict
+
 
 __all__ = [
-    "SosOrderReferences",
     "SosPostalAddress",
     "SosReference",
     "SosSalesOrderCreate",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+from dataclasses import dataclass
 
 from sqlalchemy import (
     Boolean,
@@ -12,11 +13,12 @@ from sqlalchemy import (
     JSON,
     String,
     Text,
+    UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.database import Base
-
 
 SOS_SCHEMA = "sos"
 
@@ -26,8 +28,10 @@ class SosSalesOrderHeader(Base):
     __table_args__ = {"schema": SOS_SCHEMA}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    starred: Mapped[int] = mapped_column(Integer, default=0)
-    sync_token: Mapped[int] = mapped_column(Integer, default=0)
+    starred: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
+    sync_token: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
     number: Mapped[str | None] = mapped_column(String(128), nullable=True)
     date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
@@ -133,11 +137,11 @@ class SosSalesOrderHeader(Base):
         back_populates="header",
         cascade="all, delete-orphan",
     )
-    linked_transactions: Mapped[
-        list["SosSalesOrderHeaderLinkedTransactions"]
-    ] = relationship(
-        back_populates="header",
-        cascade="all, delete-orphan",
+    linked_transactions: Mapped[list["SosSalesOrderHeaderLinkedTransactions"]] = (
+        relationship(
+            back_populates="header",
+            cascade="all, delete-orphan",
+        )
     )
 
 
@@ -159,12 +163,8 @@ class SosSalesOrderLine(Base):
     job_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     workcenter_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     tax_taxable: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
-    tax_tax_code_raw: Mapped[dict[str, Any] | None] = mapped_column(
-        JSON, nullable=True
-    )
-    tax_tax_exempt_reason_id: Mapped[int | None] = mapped_column(
-        Integer, nullable=True
-    )
+    tax_tax_code_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    tax_tax_exempt_reason_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
     weight: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -192,11 +192,11 @@ class SosSalesOrderLine(Base):
     bin: Mapped[str | None] = mapped_column(Text, nullable=True)
     lot: Mapped[str | None] = mapped_column(Text, nullable=True)
     header: Mapped["SosSalesOrderHeader"] = relationship(back_populates="lines")
-    linked_transactions: Mapped[
-        list["SosSalesOrderLineLinkedTransactions"]
-    ] = relationship(
-        back_populates="line",
-        cascade="all, delete-orphan",
+    linked_transactions: Mapped[list["SosSalesOrderLineLinkedTransactions"]] = (
+        relationship(
+            back_populates="line",
+            cascade="all, delete-orphan",
+        )
     )
 
 
@@ -213,9 +213,7 @@ class SosSalesOrderCustomField(Base):
     value: Mapped[str | None] = mapped_column(Text, nullable=True)
     data_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
-    header: Mapped["SosSalesOrderHeader"] = relationship(
-        back_populates="custom_fields"
-    )
+    header: Mapped["SosSalesOrderHeader"] = relationship(back_populates="custom_fields")
 
 
 class SosSalesOrderHeaderLinkedTransactions(Base):
@@ -259,8 +257,10 @@ class SosInvoiceHeader(Base):
     __table_args__ = {"schema": SOS_SCHEMA}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    starred: Mapped[int] = mapped_column(Integer, default=0)
-    sync_token: Mapped[int] = mapped_column(Integer, default=0)
+    starred: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
+    sync_token: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
     number: Mapped[str | None] = mapped_column(String(128), nullable=True)
     date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
@@ -355,11 +355,11 @@ class SosInvoiceHeader(Base):
         back_populates="header",
         cascade="all, delete-orphan",
     )
-    linked_transactions: Mapped[
-        list["SosInvoiceHeaderLinkedTransactions"]
-    ] = relationship(
-        back_populates="header",
-        cascade="all, delete-orphan",
+    linked_transactions: Mapped[list["SosInvoiceHeaderLinkedTransactions"]] = (
+        relationship(
+            back_populates="header",
+            cascade="all, delete-orphan",
+        )
     )
 
 
@@ -381,12 +381,8 @@ class SosInvoiceLine(Base):
     job_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     workcenter_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     tax_taxable: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
-    tax_tax_code_raw: Mapped[dict[str, Any] | None] = mapped_column(
-        JSON, nullable=True
-    )
-    tax_tax_exempt_reason_id: Mapped[int | None] = mapped_column(
-        Integer, nullable=True
-    )
+    tax_tax_code_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    tax_tax_exempt_reason_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
     weight: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -414,11 +410,11 @@ class SosInvoiceLine(Base):
     bin: Mapped[str | None] = mapped_column(Text, nullable=True)
     lot: Mapped[str | None] = mapped_column(Text, nullable=True)
     header: Mapped["SosInvoiceHeader"] = relationship(back_populates="lines")
-    linked_transactions: Mapped[
-        list["SosInvoiceLineLinkedTransactions"]
-    ] = relationship(
-        back_populates="line",
-        cascade="all, delete-orphan",
+    linked_transactions: Mapped[list["SosInvoiceLineLinkedTransactions"]] = (
+        relationship(
+            back_populates="line",
+            cascade="all, delete-orphan",
+        )
     )
 
 
@@ -469,9 +465,7 @@ class SosInvoiceLineLinkedTransactions(Base):
     line_number: Mapped[int] = mapped_column(Integer, primary_key=True)
     ref_number: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    line: Mapped["SosInvoiceLine"] = relationship(
-        back_populates="linked_transactions"
-    )
+    line: Mapped["SosInvoiceLine"] = relationship(back_populates="linked_transactions")
 
 
 class SosShipmentHeader(Base):
@@ -479,8 +473,10 @@ class SosShipmentHeader(Base):
     __table_args__ = {"schema": SOS_SCHEMA}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    starred: Mapped[int] = mapped_column(Integer, default=0)
-    sync_token: Mapped[int] = mapped_column(Integer, default=0)
+    starred: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
+    sync_token: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
     number: Mapped[str | None] = mapped_column(String(128), nullable=True)
     date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
@@ -559,11 +555,11 @@ class SosShipmentHeader(Base):
         back_populates="header",
         cascade="all, delete-orphan",
     )
-    linked_transactions: Mapped[
-        list["SosShipmentHeaderLinkedTransactions"]
-    ] = relationship(
-        back_populates="header",
-        cascade="all, delete-orphan",
+    linked_transactions: Mapped[list["SosShipmentHeaderLinkedTransactions"]] = (
+        relationship(
+            back_populates="header",
+            cascade="all, delete-orphan",
+        )
     )
 
 
@@ -585,12 +581,8 @@ class SosShipmentLine(Base):
     job_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     workcenter_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     tax_taxable: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
-    tax_tax_code_raw: Mapped[dict[str, Any] | None] = mapped_column(
-        JSON, nullable=True
-    )
-    tax_tax_exempt_reason_id: Mapped[int | None] = mapped_column(
-        Integer, nullable=True
-    )
+    tax_tax_code_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    tax_tax_exempt_reason_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
     weight: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -618,11 +610,11 @@ class SosShipmentLine(Base):
     bin: Mapped[str | None] = mapped_column(Text, nullable=True)
     lot: Mapped[str | None] = mapped_column(Text, nullable=True)
     header: Mapped["SosShipmentHeader"] = relationship(back_populates="lines")
-    linked_transactions: Mapped[
-        list["SosShipmentLineLinkedTransactions"]
-    ] = relationship(
-        back_populates="line",
-        cascade="all, delete-orphan",
+    linked_transactions: Mapped[list["SosShipmentLineLinkedTransactions"]] = (
+        relationship(
+            back_populates="line",
+            cascade="all, delete-orphan",
+        )
     )
 
 
@@ -673,9 +665,7 @@ class SosShipmentLineLinkedTransactions(Base):
     line_number: Mapped[int] = mapped_column(Integer, primary_key=True)
     ref_number: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    line: Mapped["SosShipmentLine"] = relationship(
-        back_populates="linked_transactions"
-    )
+    line: Mapped["SosShipmentLine"] = relationship(back_populates="linked_transactions")
 
 
 class SosItemReceiptHeader(Base):
@@ -683,8 +673,10 @@ class SosItemReceiptHeader(Base):
     __table_args__ = {"schema": SOS_SCHEMA}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    starred: Mapped[int] = mapped_column(Integer, default=0)
-    sync_token: Mapped[int] = mapped_column(Integer, default=0)
+    starred: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
+    sync_token: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
     number: Mapped[str | None] = mapped_column(String(128), nullable=True)
     date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
@@ -719,9 +711,7 @@ class SosItemReceiptHeader(Base):
     archived: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     summary_only: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     has_signature: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
-    update_default_costs: Mapped[bool | None] = mapped_column(
-        Boolean, nullable=True
-    )
+    update_default_costs: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     auto_serial_lots: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     keys_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     values_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
@@ -733,11 +723,11 @@ class SosItemReceiptHeader(Base):
         back_populates="header",
         cascade="all, delete-orphan",
     )
-    linked_transactions: Mapped[
-        list["SosItemReceiptHeaderLinkedTransactions"]
-    ] = relationship(
-        back_populates="header",
-        cascade="all, delete-orphan",
+    linked_transactions: Mapped[list["SosItemReceiptHeaderLinkedTransactions"]] = (
+        relationship(
+            back_populates="header",
+            cascade="all, delete-orphan",
+        )
     )
     other_costs: Mapped[list["SosItemReceiptOtherCost"]] = relationship(
         back_populates="header",
@@ -765,12 +755,8 @@ class SosItemReceiptLine(Base):
     workcenter_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     customer_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     tax_taxable: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
-    tax_tax_code_raw: Mapped[dict[str, Any] | None] = mapped_column(
-        JSON, nullable=True
-    )
-    tax_tax_exempt_reason_id: Mapped[int | None] = mapped_column(
-        Integer, nullable=True
-    )
+    tax_tax_code_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    tax_tax_exempt_reason_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
     weight: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -788,11 +774,11 @@ class SosItemReceiptLine(Base):
         DateTime(timezone=True), nullable=True
     )
     header: Mapped["SosItemReceiptHeader"] = relationship(back_populates="lines")
-    linked_transactions: Mapped[
-        list["SosItemReceiptLineLinkedTransactions"]
-    ] = relationship(
-        back_populates="line",
-        cascade="all, delete-orphan",
+    linked_transactions: Mapped[list["SosItemReceiptLineLinkedTransactions"]] = (
+        relationship(
+            back_populates="line",
+            cascade="all, delete-orphan",
+        )
     )
 
 
@@ -878,8 +864,10 @@ class SosItem(Base):
     __table_args__ = {"schema": SOS_SCHEMA}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    starred: Mapped[int] = mapped_column(Integer, default=0)
-    sync_token: Mapped[int] = mapped_column(Integer, default=0)
+    starred: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
+    sync_token: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
     name: Mapped[str | None] = mapped_column(Text, nullable=True)
     fullname: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -1015,3 +1003,62 @@ class SosItemUom(Base):
     purchase_cost: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     item: Mapped["SosItem"] = relationship(back_populates="uoms")
+
+
+class SosSalesOrderSync(Base):
+    """
+    Track SOS order create posts for idempotency and external ID mapping.
+    """
+
+    __tablename__ = "sales_order_sync"
+    __table_args__ = (
+        UniqueConstraint(
+            "source", "source_line_key", name="ux_sos_order_sync_source_line"
+        ),
+        {"schema": SOS_SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_header_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    source_line_key: Mapped[str] = mapped_column(String(512), nullable=False)
+
+    payload_hash: Mapped[str | None] = mapped_column(String(255))
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="pending", server_default="pending"
+    )
+    attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    last_error: Mapped[str | None] = mapped_column(Text)
+
+    sos_order_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    sos_line_id: Mapped[int | None] = mapped_column(Integer)
+    last_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+@dataclass
+class SosSalesOrderSyncStats:
+    since: datetime | None = None
+    synced: int = 0
+    posted: int = 0
+    failed: int = 0
+    errors: int = 0
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "synced": self.synced,
+            "posted": self.posted,
+            "failed": self.failed,
+            "errors": self.errors,
+        }

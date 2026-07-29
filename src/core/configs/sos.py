@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone, time
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from pydantic import Field
 from dataclasses import dataclass, field
@@ -9,6 +10,9 @@ from typing import ClassVar, Any
 from .base import AppBaseSettings
 
 from src.storage.states.state_store import sos_state
+
+CENTRAL_TZ = ZoneInfo("America/Chicago")
+UTC_TZ = ZoneInfo("UTC")
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +37,32 @@ class SosSettings(AppBaseSettings):
     sos_rate_limiter: float = .501
     sos_poll_interval_minutes: int = 5
     sos_lake_load_interval_minutes: int = 5
+
+    sos_clt_location_dict: dict[str, Any] = {"id": 1, "name": "Productiv CLT"}
+    sos_ksp_location_dict: dict[str, Any] = {"id": 4, "name": "KSP"}
+
+    sos_ready_to_send_order_stage_dict: dict[str, Any] = {"id": 10, "name": "Ready to Send"}
+    sos_marketplace_order_stage_dict: dict[str, Any] = {"id": 21, "name": "Marketplace Order"}
+
+    sos_default_terms_dict: dict[str, Any] = {"id": 4, "name": "Net 30"}
+
+    sos_b2b_class_dict: dict[str, Any] = {"id": 1, "name": "B2B"}
+    sos_dtc_class_dict: dict[str, Any] = {"id": 2, "name": "DTC"}
+
+    sos_default_exchange_rate: float = 1.0
+
+    sos_uom_ea_dict: dict[str, Any] = {"id": 1, "name": "EA"}
+    sos_uom_ca_dict: dict[str, Any] = {"id": 3, "name": "CA"}
+
+    sos_dtc_channel_dict: dict[str, Any] = {"id": 1,"name": "DTC"}
+    sos_b2b_channel_dict: dict[str, Any] = {"id": 2,"name": "B2B"}
+
+    sos_item_taxable_dict: dict[str, Any] = {"taxable": True}
+    sos_item_non_taxable_dict: dict[str, Any] = {"taxable": False}
+
+    sos_default_so_prefix: str = "SO"
+    sos_default_api_prefix: str = "API"
+    sos_default_mkt_prefix: str = "MKT"
 
     SOS_ENDPOINTS: ClassVar[tuple[SOSEndpoint, ...]] = (
         SOSEndpoint(
@@ -164,16 +194,41 @@ class SosSettings(AppBaseSettings):
         except:
             return one_day_back
 
-    @classmethod
-    def sos_timestamp_format(cls, dt: date | datetime | None) -> str:
 
-        if not dt:
-            return (datetime.now(timezone.utc)).isoformat(timespec="seconds")
-        if isinstance(dt, datetime):
-            return dt.isoformat(timespec="seconds")
-        if isinstance(dt, date):
-            dt_comb = datetime.combine(dt, datetime.min.time(), tzinfo=timezone.utc)
-            return dt_comb.isoformat(timespec="seconds")
+    @classmethod
+    def sos_timestamp_format(
+        cls,
+        dt: date | datetime | None,
+        *,
+        midnight: bool = False,
+    ) -> str:
+        if dt is None:
+            value = datetime.now(CENTRAL_TZ)
+
+        elif isinstance(dt, datetime):
+            if dt.tzinfo is None:
+                # Treat a naive datetime as Central time.
+                value = dt.replace(tzinfo=CENTRAL_TZ)
+            else:
+                # Convert the actual instant into Central time.
+                value = dt.astimezone(CENTRAL_TZ)
+
+        else:
+            value = datetime.combine(
+                dt,
+                time.min,
+                tzinfo=CENTRAL_TZ,
+            )
+
+        if midnight:
+            value = value.replace(
+                hour=0,
+                minute=0,
+                second=0,
+                microsecond=0,
+            )
+
+        return value.replace(tzinfo=None).isoformat(timespec="seconds")
 
     @property
     def sos_base_headers(self) -> dict[str, str]:

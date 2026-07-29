@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text
@@ -8,8 +8,24 @@ from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from src.database.database import Base
 
-
 ACENDA_SCHEMA = "acenda"
+
+
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    return value
+
+
+def _json_safe_column_dict(model: Any) -> dict[str, Any]:
+    return {
+        column.name: _json_safe(getattr(model, column.name))
+        for column in model.__table__.columns
+    }
 
 
 class AcendaOrderHeaders(Base):
@@ -47,7 +63,7 @@ class AcendaOrderHeaders(Base):
     purchase_order: Mapped[str | None] = mapped_column(Text, nullable=True)
     external_order_id: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    sales_channel_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sales_channel_id: Mapped[int] = mapped_column(Integer, nullable=False)
     sales_channel_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     sales_channel_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
     sales_channel_subtype: Mapped[str | None] = mapped_column(
@@ -130,6 +146,14 @@ class AcendaOrderHeaders(Base):
         back_populates="order",
     )
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            column.name: getattr(self, column.name) for column in self.__table__.columns
+        }
+
+    def to_json(self) -> dict[str, Any]:
+        return _json_safe_column_dict(self)
+
 
 class AcendaOrderItems(Base):
     __tablename__ = "order_items"
@@ -163,7 +187,7 @@ class AcendaOrderItems(Base):
 
     product_name: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    sku: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    sku: Mapped[str] = mapped_column(String(128), nullable=False)
     upc: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     unit_price: Mapped[float] = mapped_column(default=0.0)
@@ -233,6 +257,14 @@ class AcendaOrderItems(Base):
         viewonly=True,
         back_populates="order_item",
     )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            column.name: getattr(self, column.name) for column in self.__table__.columns
+        }
+
+    def to_json(self) -> dict[str, Any]:
+        return _json_safe_column_dict(self)
 
 
 class AcendaOrderLineDiscounts(Base):

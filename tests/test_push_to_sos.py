@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 from pydantic import ValidationError
 
 from src.database.models.acenda_models import AcendaOrderHeaders, AcendaOrderItems
-from src.database.models.sos import SosSalesOrderHeader, SosSalesOrderLine
+from src.database.models.sos_models import SosSalesOrderHeader, SosSalesOrderLine
 from src.worker.jobs.push_data.sos_payload_mapper import (
     SosOrderReferences,
     SosSalesOrderPayloadMapper,

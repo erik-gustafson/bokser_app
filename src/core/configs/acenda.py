@@ -30,6 +30,11 @@ class AcendaSettings(AppBaseSettings):
     acenda_poll_interval_minutes: int = 5
     acenda_lake_load_interval_minutes: int = 5
 
+    # Sos Customer Name: Sos Customer ID
+    acenda_send_to_wms: dict[str, Any] = {
+        "Walmart (c)" : 206
+    }
+
     ACENDA_ENDPOINTS: ClassVar[tuple[AcendaEndpoint, ...]] = (
         AcendaEndpoint(name="new_orders", path="/order", params={"query":{"created_at":{"$gt":None}}}, state_data=("new_orders", "last_created_at"), data_type="new"),
         AcendaEndpoint(name="updated_orders", path="/order", params={"query":{"updated_at":{"$gt":None}}}, state_data=("updated_orders", "last_updated_at"), data_type="update"),
