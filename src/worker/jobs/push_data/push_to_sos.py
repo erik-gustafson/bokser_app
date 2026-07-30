@@ -43,6 +43,12 @@ class SosPostError(Exception):
 class AcendaOrderPush:
     SOURCE = "acenda"
     LOOKBACK_DAYS = 1
+    MKT_START_DATE = datetime(
+        2026,
+        6,
+        1,
+        tzinfo=timezone.utc,
+    )
 
     def __init__(self) -> None:
         self.sos_items = SosItemsForLoad()
@@ -84,27 +90,33 @@ class AcendaOrderPush:
             )
             return
 
-        # sync_rows = self.sos_so_sync._build_sync_rows(
-        #     orders=mapped_orders, source=self.SOURCE
-        # )
+        sync_rows = [
+            self.sos_so_sync._build_sync_row(
+                source=self.SOURCE,
+                header_key=str(order.number),
+                line_key=str(line.id),
+                payload_hash=self.sos_so_sync._hash_payload(line.to_payload()),
+                status="pending",
+            )
+            for order in mapped_orders
+            for line in order.lines
+        ]
 
-        # if not sync_rows:
-        #     logger.warning(
-        #         "Mapped Acenda orders did not contain any lines",
-        #         extra={"mapped_order_count": len(mapped_orders)},
-        #     )
-        #     return
+        if not sync_rows:
+            logger.warning("Mapped Acenda orders did not contain any lines")
+            return
 
+        # This transaction must finish before posting to SOS.
         async with async_session() as session:
             async with session.begin():
-                #     await self.sos_so_sync._create_sync_records(
-                #         session=session,
-                #         rows=sync_rows,
-                #     )
+                await self.sos_so_sync._upsert_sync_rows(
+                    session=session,
+                    rows=sync_rows,
+                )
 
                 tasks = [
-                    self._post_to_sos_and_log(session=session, mapped_order=mp)
-                    for mp in mapped_orders
+                    self._post_to_sos_and_log(mapped_order=order)
+                    for order in mapped_orders
                 ]
 
                 results = await asyncio.gather(*tasks)
@@ -114,35 +126,35 @@ class AcendaOrderPush:
                     if error:
                         print("Boo")
 
-    async def _post_to_sos_and_log(
-        self, session: AsyncSession, mapped_order: SosSalesOrderCreate
-    ):
+    async def _post_to_sos_and_log(self, mapped_order: SosSalesOrderCreate):
 
-        try:
-            result = await self.sos_so_sync.post_and_record(
-                session=session,
-                mapped_order=mapped_order,
-                sos_prefix=settings.sos_default_mkt_prefix,
-                source="acenda",
-            )
-            return result, None
+        async with async_session() as session:
+            async with session.begin():
+                try:
+                    result = await self.sos_so_sync.post_and_record(
+                        session=session,
+                        mapped_order=mapped_order,
+                        sos_prefix=settings.sos_default_mkt_prefix,
+                        source="acenda",
+                    )
+                    return result, None
 
-        except Exception as exc:
-            logger.exception(
-                "Failed to POST Acenda order to SOS",
-                extra={
-                    "order_number": mapped_order.number,
-                    "customer_po": mapped_order.customer_po,
-                },
-            )
+                except Exception as exc:
+                    logger.exception(
+                        "Failed to POST Acenda order to SOS",
+                        extra={
+                            "order_number": mapped_order.number,
+                            "customer_po": mapped_order.customer_po,
+                        },
+                    )
 
-            error = ErrorLog(
-                error_type="SOS POST Failure",
-                message=str(exc.args[0]),
-                context=exc.args[1].to_json(),
-            )
+                    error = ErrorLog(
+                        error_type="SOS POST Failure",
+                        message=str(exc.args[0]),
+                        context=exc.args[1].to_payload(),
+                    )
 
-            return None, error
+                    return None, error
 
     async def load_open_acenda_db_orders(
         self,
@@ -175,8 +187,8 @@ class AcendaOrderPush:
                     contains_eager(AcendaOrderHeaders.items),
                 )
                 .where(
-                    AcendaOrderHeaders.created_at
-                    >= func.current_date() - self.LOOKBACK_DAYS,
+                    AcendaOrderHeaders.created_at >= self.MKT_START_DATE,
+                    AcendaOrderHeaders.sales_channel_id == 1,
                     ~sos_order_sync_exists,
                 )
                 .order_by(
@@ -273,21 +285,6 @@ class SosSalesOrderSyncService:
             except Exception:
                 msg = resp.text or ""
             return msg.strip() == duplicate_msg
-
-        # try:
-        #     current_number = await self._next_order_number(
-        #         session, prefix=spec.order_number_prefix
-        #     )
-        # except Exception as exc:
-        #     logger.error(
-        #         "Failed to fetch initial SOS order number, falling back to timestamp: %s",
-        #         exc,
-        #     )
-        #     current_number = await self._next_order_number(
-        #         session,
-        #         prefix=spec.order_number_prefix,
-        #         use_timestamp=True,
-        #     )
 
         payload = mapped_order.to_payload()
 
@@ -540,11 +537,6 @@ class SosSalesOrderSyncService:
             next_num += 1
         return str(next_num)
 
-    # def _pick_stage(
-    #     self, subtotal: float, source: str | None
-    # ) -> tuple[int, Optional[str]]:
-    #     return _default_stage_selector(subtotal, source)
-
     def _hash_payload(self, payload: dict[str, Any]) -> str:
         as_text = json.dumps(
             payload,
@@ -597,62 +589,3 @@ class SosSalesOrderSyncService:
             status=status,
             last_error=error,
         )
-
-    ###
-
-    # def _build_sync_rows(
-    #     self,
-    #     orders: list[SosSalesOrderCreate] | SosSalesOrderCreate,
-    #     source,
-    # ) -> list[dict[str, Any]]:
-    #     """
-    #     Build the rows needed for the SOS sales-order sync table.
-    #     """
-    #     if isinstance(orders, list):
-    #         return [
-    #             {
-    #                 "source": source,
-    #                 "source_header_key": str(order.number),
-    #                 "source_line_key": str(line.id),
-    #                 "payload_hash": self._hash_payload(line.to_payload()),
-    #                 "status": "pending",
-    #             }
-    #             for order in orders
-    #             for line in order.lines
-    #         ]
-
-    #     return [
-    #         {
-    #             "source": source,
-    #             "source_header_key": str(orders.number),
-    #             "source_line_key": str(line.id),
-    #             "payload_hash": self._hash_payload(line.to_payload()),
-    #             "status": "pending",
-    #         }
-    #         for line in orders.lines
-    #     ]
-
-    # async def _create_sync_records(
-    #     self,
-    #     *,
-    #     session,
-    #     rows: list[dict[str, Any]],
-    # ) -> None:
-    #     """
-    #     Insert sync records in one statement.
-
-    #     Existing records are ignored based on the table's unique
-    #     constraint for source and source line key.
-    #     """
-    #     if not rows:
-    #         return
-
-    #     stmt = (
-    #         insert(SosSalesOrderSync)
-    #         .values(rows)
-    #         .on_conflict_do_nothing(
-    #             constraint="ux_sos_order_sync_source_line",
-    #         )
-    #     )
-
-    #     await session.execute(stmt)

@@ -161,13 +161,13 @@ def _add_reference(
     *,
     include_fullname: bool = False,
 ) -> None:
-    if not isinstance(reference, dict):
-        return
-
-    values[f"{prefix}_id"] = reference.get("id")
-    values[f"{prefix}_name"] = reference.get("name")
-    if include_fullname:
-        values[f"{prefix}_fullname"] = reference.get("fullname")
+    if isinstance(reference, dict):
+        values[f"{prefix}_id"] = reference.get("id")
+        values[f"{prefix}_name"] = reference.get("name")
+        if include_fullname:
+            values[f"{prefix}_fullname"] = reference.get("fullname")
+    elif isinstance(reference, str):
+        values[f"{prefix}_name"] = reference
 
 
 def _add_address(values: dict[str, Any], prefix: str, source: Any) -> None:
@@ -469,6 +469,8 @@ class SosPayloadMapper:
         values = _model_values(SosSalesOrderHeader, data)
         self._add_common_customer_header(values, data, include_location=True)
         _add_reference(values, "order_stage", data.get("orderStage"))
+        _add_reference(values, "channel", data.get("channel"))
+        _add_reference(values, "priority", data.get("priority"))
         header = SosSalesOrderHeader(**values)
         header.lines = [
             self._map_line(
@@ -500,6 +502,7 @@ class SosPayloadMapper:
         values = _model_values(SosInvoiceHeader, data)
         self._add_common_customer_header(values, data)
         _add_reference(values, "shipping_method", data.get("shippingMethod"))
+        _add_reference(values, "channel", data.get("channel"))
         header = SosInvoiceHeader(**values)
         header.lines = [
             self._map_line(
@@ -531,6 +534,8 @@ class SosPayloadMapper:
         values = _model_values(SosShipmentHeader, data)
         self._add_common_customer_header(values, data, include_location=True)
         _add_reference(values, "shipping_method", data.get("shippingMethod"))
+        _add_reference(values, "channel", data.get("channel"))
+        _add_reference(values, "priority", data.get("priority"))
         header = SosShipmentHeader(**values)
         header.lines = [
             self._map_line(

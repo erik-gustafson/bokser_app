@@ -78,9 +78,11 @@ class SosSalesOrderHeader(Base):
     terms_name: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     sales_rep_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
-    channel: Mapped[str | None] = mapped_column(Text, nullable=True)
+    channel_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    channel_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     department: Mapped[str | None] = mapped_column(Text, nullable=True)
-    priority: Mapped[str | None] = mapped_column(Text, nullable=True)
+    priority_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    priority_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     assigned_to_user_raw: Mapped[dict[str, Any] | None] = mapped_column(
         JSON, nullable=True
     )
@@ -304,7 +306,8 @@ class SosInvoiceHeader(Base):
     terms_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     sales_rep_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
-    channel: Mapped[str | None] = mapped_column(Text, nullable=True)
+    channel_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    channel_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     department: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     tax_code_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -519,9 +522,11 @@ class SosShipmentHeader(Base):
     shipping_postal_code: Mapped[str | None] = mapped_column(Text, nullable=True)
     shipping_country: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    channel: Mapped[str | None] = mapped_column(Text, nullable=True)
+    channel_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    channel_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     department: Mapped[str | None] = mapped_column(Text, nullable=True)
-    priority: Mapped[str | None] = mapped_column(Text, nullable=True)
+    priority_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    priority_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     assigned_to_user_raw: Mapped[dict[str, Any] | None] = mapped_column(
         JSON, nullable=True
     )

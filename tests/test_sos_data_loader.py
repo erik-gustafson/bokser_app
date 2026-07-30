@@ -83,6 +83,47 @@ class SosPayloadMapperTests(unittest.TestCase):
         self.assertEqual(other_cost.amount, 25.5)
         self.assertTrue(other_cost.bill)
 
+    def test_maps_sales_order_channel_and_priority_references(self) -> None:
+        order = self.mapper.map_sales_order(
+            {
+                "id": 10,
+                "channel": {"id": 1, "name": "DTC"},
+                "department": "Unused department",
+                "priority": {"id": 2, "name": "Normal"},
+            }
+        )
+
+        self.assertEqual(order.channel_id, 1)
+        self.assertEqual(order.channel_name, "DTC")
+        self.assertEqual(order.department, "Unused department")
+        self.assertEqual(order.priority_id, 2)
+        self.assertEqual(order.priority_name, "Normal")
+
+    def test_maps_invoice_string_channel_to_name(self) -> None:
+        invoice = self.mapper.map_invoice(
+            {
+                "id": 20,
+                "channel": "Wholesale",
+            }
+        )
+
+        self.assertIsNone(invoice.channel_id)
+        self.assertEqual(invoice.channel_name, "Wholesale")
+
+    def test_maps_shipment_channel_and_string_priority(self) -> None:
+        shipment = self.mapper.map_shipment(
+            {
+                "id": 30,
+                "channel": {"id": 3, "name": "Marketplace"},
+                "priority": "Expedited",
+            }
+        )
+
+        self.assertEqual(shipment.channel_id, 3)
+        self.assertEqual(shipment.channel_name, "Marketplace")
+        self.assertIsNone(shipment.priority_id)
+        self.assertEqual(shipment.priority_name, "Expedited")
+
     def test_only_modeled_endpoint_entities_are_claimed(self) -> None:
         self.assertIn("updated_sales_orders", SOS_ENTITY_TYPES)
         self.assertIn("updated_items", SOS_ENTITY_TYPES)
