@@ -39,6 +39,7 @@ from src.database.models.sos_models import (
     SosShipmentHeaderLinkedTransactions,
     SosShipmentLine,
     SosShipmentLineLinkedTransactions,
+    SosPurchaseOrderHeader,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,7 @@ SosRootRecord: TypeAlias = (
     | SosShipmentHeader
     | SosItemReceiptHeader
     | SosItem
+    | SosPurchaseOrderHeader
 )
 
 SOS_ENTITY_TYPES: dict[str, PayloadType] = {
@@ -70,6 +72,7 @@ PAYLOAD_MODELS: dict[PayloadType, type[SosRootRecord]] = {
     "shipment": SosShipmentHeader,
     "item_receipt": SosItemReceiptHeader,
     "item": SosItem,
+    "purchase_order": SosPurchaseOrderHeader,
 }
 
 
