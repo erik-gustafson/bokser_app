@@ -471,6 +471,474 @@ class SosInvoiceLineLinkedTransactions(Base):
     line: Mapped["SosInvoiceLine"] = relationship(back_populates="linked_transactions")
 
 
+class SosSalesReceiptHeader(Base):
+    __tablename__ = "sales_receipt_headers"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    starred: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
+    sync_token: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    fs_payment_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    number: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
+    customer_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    customer_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    customer_fullname: Mapped[str | None] = mapped_column(Text, nullable=True)
+    location_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    location_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    billing_company: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_contact: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_phone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_1: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_2: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_3: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_4: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_5: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_city: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_state_province: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_postal_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_country: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    shipping_company: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_contact: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_phone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_line_1: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_line_2: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_line_3: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_line_4: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_line_5: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_city: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_state_province: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_postal_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_country: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    payment_method_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    payment_method_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    payment_method_sync_token: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )
+    payment_method_sos_pay_type: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    deposit_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    deposit_account_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sales_rep_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    channel_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    channel_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    department: Mapped[str | None] = mapped_column(Text, nullable=True)
+    priority_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    priority_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    assigned_to_user_raw: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True
+    )
+    order_stage_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    order_stage_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tax_code_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tax_code_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    currency_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    currency_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_method_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    shipping_method_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    tracking_number: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ship_date: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    transaction_location_quickbooks: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )
+    exchange_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    customer_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    customer_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    can_ship: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    account_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    customer_po: Mapped[str | None] = mapped_column(Text, nullable=True)
+    deposit_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sub_total: Mapped[float | None] = mapped_column(Float, nullable=True)
+    discount_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
+    discount_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    tax_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
+    tax_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    shipping_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    total: Mapped[float | None] = mapped_column(Float, nullable=True)
+    discount_taxable: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    shipping_taxable: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    drop_ship: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    closed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    archived: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    summary_only: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    has_signature: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    store_customer_token: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    force_save: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    earliest_due_date: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    status_link: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sync_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_sync: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    sos_pay_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    keys_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    values_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
+    lines: Mapped[list["SosSalesReceiptLine"]] = relationship(
+        back_populates="header",
+        cascade="all, delete-orphan",
+    )
+    custom_fields: Mapped[list["SosSalesReceiptCustomField"]] = relationship(
+        back_populates="header",
+        cascade="all, delete-orphan",
+    )
+    linked_transactions: Mapped[
+        list["SosSalesReceiptHeaderLinkedTransactions"]
+    ] = relationship(
+        back_populates="header",
+        cascade="all, delete-orphan",
+    )
+
+
+class SosSalesReceiptLine(Base):
+    __tablename__ = "sales_receipt_lines"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    sales_receipt_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.sales_receipt_headers.id"),
+        index=True,
+        nullable=False,
+    )
+    line_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    item_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    item_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    class_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    class_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    job_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    workcenter_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    tax_taxable: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    tax_tax_code_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    tax_tax_exempt_reason_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    weight: Mapped[float | None] = mapped_column(Float, nullable=True)
+    volume: Mapped[float | None] = mapped_column(Float, nullable=True)
+    weight_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    volume_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    unit_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    alt_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    picked: Mapped[float | None] = mapped_column(Float, nullable=True)
+    shipped: Mapped[float | None] = mapped_column(Float, nullable=True)
+    invoiced: Mapped[float | None] = mapped_column(Float, nullable=True)
+    produced: Mapped[float | None] = mapped_column(Float, nullable=True)
+    returned: Mapped[float | None] = mapped_column(Float, nullable=True)
+    cost: Mapped[float | None] = mapped_column(Float, nullable=True)
+    margin: Mapped[float | None] = mapped_column(Float, nullable=True)
+    list_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    percent_discount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    back_ordered: Mapped[float | None] = mapped_column(Float, nullable=True)
+    due_date: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    uom_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    uom_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    bin: Mapped[str | None] = mapped_column(Text, nullable=True)
+    lot: Mapped[str | None] = mapped_column(Text, nullable=True)
+    serials_raw: Mapped[list[Any] | None] = mapped_column(JSON, nullable=True)
+
+    header: Mapped["SosSalesReceiptHeader"] = relationship(back_populates="lines")
+    linked_transactions: Mapped[
+        list["SosSalesReceiptLineLinkedTransactions"]
+    ] = relationship(
+        back_populates="line",
+        cascade="all, delete-orphan",
+    )
+
+
+class SosSalesReceiptCustomField(Base):
+    __tablename__ = "sales_receipt_custom_fields"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    sales_receipt_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.sales_receipt_headers.id"),
+        primary_key=True,
+    )
+    custom_field_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    header: Mapped["SosSalesReceiptHeader"] = relationship(
+        back_populates="custom_fields"
+    )
+
+
+class SosSalesReceiptHeaderLinkedTransactions(Base):
+    __tablename__ = "sales_receipt_header_linked_transactions"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    sales_receipt_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.sales_receipt_headers.id"),
+        primary_key=True,
+    )
+    linked_transaction_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    type: Mapped[str] = mapped_column(String(64), primary_key=True)
+    line_number: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ref_number: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    header: Mapped["SosSalesReceiptHeader"] = relationship(
+        back_populates="linked_transactions"
+    )
+
+
+class SosSalesReceiptLineLinkedTransactions(Base):
+    __tablename__ = "sales_receipt_line_linked_transactions"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    sales_receipt_line_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.sales_receipt_lines.id"),
+        primary_key=True,
+    )
+    linked_transaction_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    type: Mapped[str] = mapped_column(String(64), primary_key=True)
+    line_number: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ref_number: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    line: Mapped["SosSalesReceiptLine"] = relationship(
+        back_populates="linked_transactions"
+    )
+
+
+class SosEstimateHeader(Base):
+    __tablename__ = "estimate_headers"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    starred: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
+    sync_token: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    number: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
+    customer_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    customer_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    customer_fullname: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    billing_company: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_contact: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_phone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_1: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_2: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_3: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_4: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_5: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_city: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_state_province: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_postal_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_country: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    shipping_company: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_contact: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_phone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_line_1: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_line_2: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_line_3: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_line_4: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_line_5: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_city: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_state_province: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_postal_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_country: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    sales_rep_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    channel_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    channel_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    department: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tax_code_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tax_code_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    currency_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    currency_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    transaction_location_quickbooks: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )
+    exchange_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    customer_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    customer_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    deposit_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sub_total: Mapped[float | None] = mapped_column(Float, nullable=True)
+    discount_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
+    discount_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    tax_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
+    tax_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    shipping_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    total: Mapped[float | None] = mapped_column(Float, nullable=True)
+    discount_taxable: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    shipping_taxable: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    status: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    accepted_by_raw: Mapped[Any | None] = mapped_column(JSON, nullable=True)
+    accepted_date: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    expiration: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    archived: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    summary_only: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    has_signature: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    force_save: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    sync_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_sync: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    keys_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    values_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
+    lines: Mapped[list["SosEstimateLine"]] = relationship(
+        back_populates="header",
+        cascade="all, delete-orphan",
+    )
+    custom_fields: Mapped[list["SosEstimateCustomField"]] = relationship(
+        back_populates="header",
+        cascade="all, delete-orphan",
+    )
+    linked_transactions: Mapped[list["SosEstimateHeaderLinkedTransactions"]] = (
+        relationship(
+            back_populates="header",
+            cascade="all, delete-orphan",
+        )
+    )
+
+
+class SosEstimateLine(Base):
+    __tablename__ = "estimate_lines"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    estimate_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.estimate_headers.id"),
+        index=True,
+        nullable=False,
+    )
+    line_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    item_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    item_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    class_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    class_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    job_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    workcenter_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    tax_taxable: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    tax_tax_code_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    tax_tax_exempt_reason_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    weight: Mapped[float | None] = mapped_column(Float, nullable=True)
+    volume: Mapped[float | None] = mapped_column(Float, nullable=True)
+    weight_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    volume_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    unit_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    alt_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    picked: Mapped[float | None] = mapped_column(Float, nullable=True)
+    shipped: Mapped[float | None] = mapped_column(Float, nullable=True)
+    invoiced: Mapped[float | None] = mapped_column(Float, nullable=True)
+    produced: Mapped[float | None] = mapped_column(Float, nullable=True)
+    returned: Mapped[float | None] = mapped_column(Float, nullable=True)
+    cost: Mapped[float | None] = mapped_column(Float, nullable=True)
+    margin: Mapped[float | None] = mapped_column(Float, nullable=True)
+    list_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    percent_discount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    back_ordered: Mapped[float | None] = mapped_column(Float, nullable=True)
+    due_date: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    uom_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    uom_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    bin: Mapped[str | None] = mapped_column(Text, nullable=True)
+    lot: Mapped[str | None] = mapped_column(Text, nullable=True)
+    serials_raw: Mapped[list[Any] | None] = mapped_column(JSON, nullable=True)
+
+    header: Mapped["SosEstimateHeader"] = relationship(back_populates="lines")
+    linked_transactions: Mapped[list["SosEstimateLineLinkedTransactions"]] = (
+        relationship(
+            back_populates="line",
+            cascade="all, delete-orphan",
+        )
+    )
+
+
+class SosEstimateCustomField(Base):
+    __tablename__ = "estimate_custom_fields"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    estimate_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.estimate_headers.id"),
+        primary_key=True,
+    )
+    custom_field_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    header: Mapped["SosEstimateHeader"] = relationship(back_populates="custom_fields")
+
+
+class SosEstimateHeaderLinkedTransactions(Base):
+    __tablename__ = "estimate_header_linked_transactions"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    estimate_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.estimate_headers.id"),
+        primary_key=True,
+    )
+    linked_transaction_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    type: Mapped[str] = mapped_column(String(64), primary_key=True)
+    line_number: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ref_number: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    header: Mapped["SosEstimateHeader"] = relationship(
+        back_populates="linked_transactions"
+    )
+
+
+class SosEstimateLineLinkedTransactions(Base):
+    __tablename__ = "estimate_line_linked_transactions"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    estimate_line_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.estimate_lines.id"),
+        primary_key=True,
+    )
+    linked_transaction_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    type: Mapped[str] = mapped_column(String(64), primary_key=True)
+    line_number: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ref_number: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    line: Mapped["SosEstimateLine"] = relationship(
+        back_populates="linked_transactions"
+    )
+
+
 class SosShipmentHeader(Base):
     __tablename__ = "shipment_headers"
     __table_args__ = {"schema": SOS_SCHEMA}
@@ -671,6 +1139,374 @@ class SosShipmentLineLinkedTransactions(Base):
     ref_number: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     line: Mapped["SosShipmentLine"] = relationship(back_populates="linked_transactions")
+
+
+class SosReturnHeader(Base):
+    __tablename__ = "return_headers"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    populate_from_object_type: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    populate_from_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    starred: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
+    sync_token: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    number: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
+    customer_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    customer_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    customer_fullname: Mapped[str | None] = mapped_column(Text, nullable=True)
+    currency_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    currency_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    location_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    location_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sales_rep_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    channel_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    channel_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    department: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_method_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    shipping_method_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    tracking_number: Mapped[str | None] = mapped_column(Text, nullable=True)
+    exchange_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    customer_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    customer_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ship_by: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    shipping_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    total: Mapped[float | None] = mapped_column(Float, nullable=True)
+    create_credit_memo: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    create_bill_for_shipping_amount: Mapped[bool | None] = mapped_column(
+        Boolean, nullable=True
+    )
+    archived: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    summary_only: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    has_signature: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    keys_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    values_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
+    lines: Mapped[list["SosReturnLine"]] = relationship(
+        back_populates="header",
+        cascade="all, delete-orphan",
+    )
+    custom_fields: Mapped[list["SosReturnCustomField"]] = relationship(
+        back_populates="header",
+        cascade="all, delete-orphan",
+    )
+    linked_transactions: Mapped[list["SosReturnHeaderLinkedTransactions"]] = (
+        relationship(
+            back_populates="header",
+            cascade="all, delete-orphan",
+        )
+    )
+
+
+class SosReturnLine(Base):
+    __tablename__ = "return_lines"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    return_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.return_headers.id"),
+        index=True,
+        nullable=False,
+    )
+    line_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    item_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    item_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    class_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    class_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    job_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    workcenter_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    tax_taxable: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    tax_tax_code_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    tax_tax_exempt_reason_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    weight: Mapped[float | None] = mapped_column(Float, nullable=True)
+    volume: Mapped[float | None] = mapped_column(Float, nullable=True)
+    weight_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    volume_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    unit_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    alt_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    picked: Mapped[float | None] = mapped_column(Float, nullable=True)
+    shipped: Mapped[float | None] = mapped_column(Float, nullable=True)
+    invoiced: Mapped[float | None] = mapped_column(Float, nullable=True)
+    produced: Mapped[float | None] = mapped_column(Float, nullable=True)
+    returned: Mapped[float | None] = mapped_column(Float, nullable=True)
+    cost: Mapped[float | None] = mapped_column(Float, nullable=True)
+    margin: Mapped[float | None] = mapped_column(Float, nullable=True)
+    list_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    percent_discount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    back_ordered: Mapped[float | None] = mapped_column(Float, nullable=True)
+    due_date: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    uom_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    uom_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    bin: Mapped[str | None] = mapped_column(Text, nullable=True)
+    lot: Mapped[str | None] = mapped_column(Text, nullable=True)
+    serials_raw: Mapped[list[Any] | None] = mapped_column(JSON, nullable=True)
+
+    header: Mapped["SosReturnHeader"] = relationship(back_populates="lines")
+    linked_transactions: Mapped[list["SosReturnLineLinkedTransactions"]] = (
+        relationship(
+            back_populates="line",
+            cascade="all, delete-orphan",
+        )
+    )
+
+
+class SosReturnCustomField(Base):
+    __tablename__ = "return_custom_fields"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    return_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.return_headers.id"),
+        primary_key=True,
+    )
+    custom_field_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    header: Mapped["SosReturnHeader"] = relationship(back_populates="custom_fields")
+
+
+class SosReturnHeaderLinkedTransactions(Base):
+    __tablename__ = "return_header_linked_transactions"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    return_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.return_headers.id"),
+        primary_key=True,
+    )
+    linked_transaction_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    type: Mapped[str] = mapped_column(String(64), primary_key=True)
+    line_number: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ref_number: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    header: Mapped["SosReturnHeader"] = relationship(
+        back_populates="linked_transactions"
+    )
+
+
+class SosReturnLineLinkedTransactions(Base):
+    __tablename__ = "return_line_linked_transactions"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    return_line_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.return_lines.id"),
+        primary_key=True,
+    )
+    linked_transaction_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    type: Mapped[str] = mapped_column(String(64), primary_key=True)
+    line_number: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ref_number: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    line: Mapped["SosReturnLine"] = relationship(back_populates="linked_transactions")
+
+
+class SosRmaHeader(Base):
+    __tablename__ = "rma_headers"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    starred: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
+    sync_token: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    number: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
+    customer_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    customer_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    customer_fullname: Mapped[str | None] = mapped_column(Text, nullable=True)
+    location_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    location_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    billing_company: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_contact: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_phone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_1: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_2: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_3: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_4: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_5: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_city: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_state_province: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_postal_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_country: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    shipping_company: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_contact: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_phone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_line_1: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_line_2: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_line_3: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_line_4: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_line_5: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_city: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_state_province: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_postal_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_country: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    sales_rep_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    channel_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    channel_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    department: Mapped[str | None] = mapped_column(Text, nullable=True)
+    return_status: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    expiration: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    shipping_method_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    shipping_method_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tracking_number: Mapped[str | None] = mapped_column(Text, nullable=True)
+    customer_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    customer_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    total: Mapped[float | None] = mapped_column(Float, nullable=True)
+    closed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    archived: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    summary_only: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    has_signature: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    keys_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    values_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
+    lines: Mapped[list["SosRmaLine"]] = relationship(
+        back_populates="header",
+        cascade="all, delete-orphan",
+    )
+    custom_fields: Mapped[list["SosRmaCustomField"]] = relationship(
+        back_populates="header",
+        cascade="all, delete-orphan",
+    )
+    linked_transactions: Mapped[list["SosRmaHeaderLinkedTransactions"]] = (
+        relationship(
+            back_populates="header",
+            cascade="all, delete-orphan",
+        )
+    )
+
+
+class SosRmaLine(Base):
+    __tablename__ = "rma_lines"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    rma_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.rma_headers.id"),
+        index=True,
+        nullable=False,
+    )
+    line_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    item_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    item_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    class_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    class_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    job_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    workcenter_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    tax_taxable: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    tax_tax_code_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    tax_tax_exempt_reason_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    weight: Mapped[float | None] = mapped_column(Float, nullable=True)
+    volume: Mapped[float | None] = mapped_column(Float, nullable=True)
+    weight_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    volume_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    unit_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    alt_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    picked: Mapped[float | None] = mapped_column(Float, nullable=True)
+    shipped: Mapped[float | None] = mapped_column(Float, nullable=True)
+    invoiced: Mapped[float | None] = mapped_column(Float, nullable=True)
+    produced: Mapped[float | None] = mapped_column(Float, nullable=True)
+    returned: Mapped[float | None] = mapped_column(Float, nullable=True)
+    cost: Mapped[float | None] = mapped_column(Float, nullable=True)
+    margin: Mapped[float | None] = mapped_column(Float, nullable=True)
+    list_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    percent_discount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    back_ordered: Mapped[float | None] = mapped_column(Float, nullable=True)
+    due_date: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    uom_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    uom_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    bin: Mapped[str | None] = mapped_column(Text, nullable=True)
+    lot: Mapped[str | None] = mapped_column(Text, nullable=True)
+    serials_raw: Mapped[list[Any] | None] = mapped_column(JSON, nullable=True)
+
+    header: Mapped["SosRmaHeader"] = relationship(back_populates="lines")
+    linked_transactions: Mapped[list["SosRmaLineLinkedTransactions"]] = (
+        relationship(
+            back_populates="line",
+            cascade="all, delete-orphan",
+        )
+    )
+
+
+class SosRmaCustomField(Base):
+    __tablename__ = "rma_custom_fields"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    rma_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.rma_headers.id"),
+        primary_key=True,
+    )
+    custom_field_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    header: Mapped["SosRmaHeader"] = relationship(back_populates="custom_fields")
+
+
+class SosRmaHeaderLinkedTransactions(Base):
+    __tablename__ = "rma_header_linked_transactions"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    rma_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.rma_headers.id"),
+        primary_key=True,
+    )
+    linked_transaction_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    type: Mapped[str] = mapped_column(String(64), primary_key=True)
+    line_number: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ref_number: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    header: Mapped["SosRmaHeader"] = relationship(
+        back_populates="linked_transactions"
+    )
+
+
+class SosRmaLineLinkedTransactions(Base):
+    __tablename__ = "rma_line_linked_transactions"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    rma_line_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.rma_lines.id"),
+        primary_key=True,
+    )
+    linked_transaction_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    type: Mapped[str] = mapped_column(String(64), primary_key=True)
+    line_number: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ref_number: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    line: Mapped["SosRmaLine"] = relationship(back_populates="linked_transactions")
 
 
 class SosPurchaseOrderHeader(Base):
@@ -1231,6 +2067,406 @@ class SosItemUom(Base):
     purchase_cost: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     item: Mapped["SosItem"] = relationship(back_populates="uoms")
+
+
+class SosCustomer(Base):
+    __tablename__ = "customers"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    starred: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
+    sync_token: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fullname: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parent_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    parent_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parent_fullname: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sublevel: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    website: Mapped[str | None] = mapped_column(Text, nullable=True)
+    phone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mobile: Mapped[str | None] = mapped_column(Text, nullable=True)
+    alt_phone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fax: Mapped[str | None] = mapped_column(Text, nullable=True)
+    company_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    portal_password: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    contact_title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    contact_first_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    contact_middle_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    contact_last_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    contact_suffix: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    billing_address_line_1: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_2: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_3: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_4: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_5: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_city: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_state_province: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_postal_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_country: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    shipping_address_line_1: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_line_2: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_line_3: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_line_4: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_address_line_5: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_city: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_state_province: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_postal_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_country: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    terms_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    terms_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    price_tier_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    price_tier_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    payment_method_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    payment_method_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    payment_method_sync_token: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )
+    payment_method_sos_pay_type: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    sales_rep_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    customer_type_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    customer_type_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resale_number: Mapped[str | None] = mapped_column(Text, nullable=True)
+    contractor_number: Mapped[str | None] = mapped_column(Text, nullable=True)
+    business_license: Mapped[str | None] = mapped_column(Text, nullable=True)
+    found_us_via_raw: Mapped[Any | None] = mapped_column(JSON, nullable=True)
+    currency_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    currency_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    tax_taxable: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    tax_tax_code_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    tax_tax_exempt_reason_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    credit_hold: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    bill_with_parent: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    archived: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    has_children: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    summary_only: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    is_in_quick_books: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    sync_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_sync: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    has_card_on_file: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    last_four: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    exp_month: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    exp_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    token_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    keys_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    values_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
+    custom_fields: Mapped[list["SosCustomerCustomField"]] = relationship(
+        back_populates="customer",
+        cascade="all, delete-orphan",
+    )
+    alt_addresses: Mapped[list["SosCustomerAltAddress"]] = relationship(
+        back_populates="customer",
+        cascade="all, delete-orphan",
+    )
+
+
+class SosCustomerCustomField(Base):
+    __tablename__ = "customer_custom_fields"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    customer_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.customers.id"),
+        primary_key=True,
+    )
+    custom_field_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    customer: Mapped["SosCustomer"] = relationship(back_populates="custom_fields")
+
+
+class SosCustomerAltAddress(Base):
+    __tablename__ = "customer_alt_addresses"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    customer_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.customers.id"),
+        primary_key=True,
+    )
+    address_index: Mapped[int] = mapped_column(Integer, primary_key=True)
+    company: Mapped[str | None] = mapped_column(Text, nullable=True)
+    contact: Mapped[str | None] = mapped_column(Text, nullable=True)
+    phone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    address_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    address_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    address_line_1: Mapped[str | None] = mapped_column(Text, nullable=True)
+    address_line_2: Mapped[str | None] = mapped_column(Text, nullable=True)
+    address_line_3: Mapped[str | None] = mapped_column(Text, nullable=True)
+    address_line_4: Mapped[str | None] = mapped_column(Text, nullable=True)
+    address_line_5: Mapped[str | None] = mapped_column(Text, nullable=True)
+    city: Mapped[str | None] = mapped_column(Text, nullable=True)
+    state_province: Mapped[str | None] = mapped_column(Text, nullable=True)
+    postal_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    country: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    customer: Mapped["SosCustomer"] = relationship(back_populates="alt_addresses")
+
+
+class SosPaymentHeader(Base):
+    __tablename__ = "payment_headers"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    starred: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
+    sync_token: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    sync_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_sync: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    number: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
+    customer_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    customer_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    customer_fullname: Mapped[str | None] = mapped_column(Text, nullable=True)
+    location_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    location_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    payment_method_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    payment_method_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    payment_method_sync_token: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )
+    payment_method_sos_pay_type: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    currency_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    currency_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    channel_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    channel_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    department: Mapped[str | None] = mapped_column(Text, nullable=True)
+    deposit_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    deposit_account_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    class_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    class_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    billing_company: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_contact: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_phone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_1: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_2: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_3: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_4: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_address_line_5: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_city: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_state_province: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_postal_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billing_country: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    total: Mapped[float | None] = mapped_column(Float, nullable=True)
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    customer_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    customer_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    archived: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    has_signature: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    summary_only: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    exchange_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    documents_raw: Mapped[list[Any] | None] = mapped_column(JSON, nullable=True)
+    check_number: Mapped[str | None] = mapped_column(Text, nullable=True)
+    create_customer_if_not_found: Mapped[bool | None] = mapped_column(
+        Boolean, nullable=True
+    )
+    has_card_on_file: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    sos_pay_raw: Mapped[Any | None] = mapped_column(JSON, nullable=True)
+
+    lines: Mapped[list["SosPaymentLine"]] = relationship(
+        back_populates="header",
+        cascade="all, delete-orphan",
+    )
+    custom_fields: Mapped[list["SosPaymentCustomField"]] = relationship(
+        back_populates="header",
+        cascade="all, delete-orphan",
+    )
+    linked_transactions: Mapped[list["SosPaymentHeaderLinkedTransactions"]] = (
+        relationship(
+            back_populates="header",
+            cascade="all, delete-orphan",
+        )
+    )
+
+
+class SosPaymentLine(Base):
+    __tablename__ = "payment_lines"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    payment_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.payment_headers.id"),
+        index=True,
+        nullable=False,
+    )
+    line_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    class_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    class_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    job_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    workcenter_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    header: Mapped["SosPaymentHeader"] = relationship(back_populates="lines")
+    linked_transactions: Mapped[list["SosPaymentLineLinkedTransactions"]] = (
+        relationship(
+            back_populates="line",
+            cascade="all, delete-orphan",
+        )
+    )
+
+
+class SosPaymentCustomField(Base):
+    __tablename__ = "payment_custom_fields"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    payment_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.payment_headers.id"),
+        primary_key=True,
+    )
+    custom_field_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    header: Mapped["SosPaymentHeader"] = relationship(back_populates="custom_fields")
+
+
+class SosPaymentHeaderLinkedTransactions(Base):
+    __tablename__ = "payment_header_linked_transactions"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    payment_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.payment_headers.id"),
+        primary_key=True,
+    )
+    linked_transaction_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    type: Mapped[str] = mapped_column(String(64), primary_key=True)
+    line_number: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ref_number: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    header: Mapped["SosPaymentHeader"] = relationship(
+        back_populates="linked_transactions"
+    )
+
+
+class SosPaymentLineLinkedTransactions(Base):
+    __tablename__ = "payment_line_linked_transactions"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    payment_line_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.payment_lines.id"),
+        primary_key=True,
+    )
+    linked_transaction_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    type: Mapped[str] = mapped_column(String(64), primary_key=True)
+    line_number: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ref_number: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    line: Mapped["SosPaymentLine"] = relationship(
+        back_populates="linked_transactions"
+    )
+
+
+class SosAdjustmentHeader(Base):
+    __tablename__ = "adjustment_headers"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    starred: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
+    sync_token: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    number: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    total: Mapped[float | None] = mapped_column(Float, nullable=True)
+    account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    account_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    location_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    location_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    department: Mapped[str | None] = mapped_column(Text, nullable=True)
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    archived: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    summary_only: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    has_signature: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    force_save: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    keys_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    values_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
+    lines: Mapped[list["SosAdjustmentLine"]] = relationship(
+        back_populates="header",
+        cascade="all, delete-orphan",
+    )
+    custom_fields: Mapped[list["SosAdjustmentCustomField"]] = relationship(
+        back_populates="header",
+        cascade="all, delete-orphan",
+    )
+
+
+class SosAdjustmentLine(Base):
+    __tablename__ = "adjustment_lines"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    adjustment_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.adjustment_headers.id"),
+        index=True,
+        nullable=False,
+    )
+    line_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    item_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    item_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    class_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    class_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    job_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    workcenter_raw: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    lot: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bin: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quantity_diff: Mapped[float | None] = mapped_column(Float, nullable=True)
+    new_quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    value_diff: Mapped[float | None] = mapped_column(Float, nullable=True)
+    uom_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    uom_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    serials_raw: Mapped[list[Any] | None] = mapped_column(JSON, nullable=True)
+
+    header: Mapped["SosAdjustmentHeader"] = relationship(back_populates="lines")
+
+
+class SosAdjustmentCustomField(Base):
+    __tablename__ = "adjustment_custom_fields"
+    __table_args__ = {"schema": SOS_SCHEMA}
+
+    adjustment_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{SOS_SCHEMA}.adjustment_headers.id"),
+        primary_key=True,
+    )
+    custom_field_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    header: Mapped["SosAdjustmentHeader"] = relationship(
+        back_populates="custom_fields"
+    )
 
 
 class SosSalesOrderSync(Base):

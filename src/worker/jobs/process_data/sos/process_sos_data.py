@@ -14,33 +14,8 @@ from sqlalchemy.orm import DeclarativeBase
 
 from src.database.database import async_session
 from src.database.models.data_lake_models import DataLakeFile
-from src.database.models.sos_models import (
-    SosInvoiceCustomField,
-    SosInvoiceHeader,
-    SosInvoiceHeaderLinkedTransactions,
-    SosInvoiceLine,
-    SosInvoiceLineLinkedTransactions,
-    SosItem,
-    SosItemCustomField,
-    SosItemReceiptCustomField,
-    SosItemReceiptHeader,
-    SosItemReceiptHeaderLinkedTransactions,
-    SosItemReceiptLine,
-    SosItemReceiptLineLinkedTransactions,
-    SosItemReceiptOtherCost,
-    SosItemUom,
-    SosSalesOrderCustomField,
-    SosSalesOrderHeader,
-    SosSalesOrderHeaderLinkedTransactions,
-    SosSalesOrderLine,
-    SosSalesOrderLineLinkedTransactions,
-    SosShipmentCustomField,
-    SosShipmentHeader,
-    SosShipmentHeaderLinkedTransactions,
-    SosShipmentLine,
-    SosShipmentLineLinkedTransactions,
-    SosPurchaseOrderHeader,
-)
+
+from src.database.models.sos_models import *
 
 logger = logging.getLogger(__name__)
 

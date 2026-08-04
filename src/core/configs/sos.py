@@ -66,19 +66,19 @@ class SosSettings(AppBaseSettings):
 
     SOS_ENDPOINTS: ClassVar[tuple[SOSEndpoint, ...]] = (
         SOSEndpoint(
-            name="new_sales_orders",
-            path="/salesorder/",
-            state_data=("sales_orders", "new"),
-        ),
-        SOSEndpoint(
             name="updated_sales_orders",
             path="/salesorder/",
             state_data=("sales_orders", "updated"),
         ),
         SOSEndpoint(
-            name="new_invoices",
-            path="/invoice/",
-            state_data=("invoices", "new")
+            name="sales_receipts",
+            path="/salesreceipt/",
+            state_data=("sales_receipts", "updated"),
+        ),
+        SOSEndpoint(
+            name="estiamtes",
+            path="/estimate/",
+            state_data=("estiamtes", "updated"),
         ),
         SOSEndpoint(
             name="updated_invoices",
@@ -86,39 +86,9 @@ class SosSettings(AppBaseSettings):
             state_data=("invoices", "updated")
         ),
         SOSEndpoint(
-            name="new_shipments",
-            path="/shipment/",
-            state_data=("shipments", "new")
-        ),
-        SOSEndpoint(
             name="updated_shipments",
             path="/shipment/",
             state_data=("shipments", "updated")
-        ),
-        SOSEndpoint(
-            name="new_payments",
-            path="/payment/",
-            state_data=("payments", "new")
-        ),
-        SOSEndpoint(
-            name="updated_payments",
-            path="/payment/",
-            state_data=("payments", "updated")
-        ),
-        SOSEndpoint(
-            name="new_purchase_orders",
-            path="/purchaseorder/",
-            state_data=("purchase_orders", "new"),
-        ),
-        SOSEndpoint(
-            name="updated_purchase_orders",
-            path="/purchaseorder/",
-            state_data=("purchase_orders", "updated"),
-        ),
-        SOSEndpoint(
-            name="new_item_receipts",
-            path="/itemreceipt/",
-            state_data=("item_receipts", "new"),
         ),
         SOSEndpoint(
             name="updated_item_receipts",
@@ -126,13 +96,58 @@ class SosSettings(AppBaseSettings):
             state_data=("item_receipts", "updated"),
         ),
         SOSEndpoint(
-            name="new_items",
-            path="/item/",
-            state_data=("items", "new")),
-        SOSEndpoint(
             name="updated_items",
             path="/item/",
             state_data=("items", "updated")),
+        SOSEndpoint(
+            name="payments",
+            path="/payment/",
+            state_data=("payments", "all")
+        ),
+        SOSEndpoint(
+            name="purchase_orders",
+            path="/purchaseorder/",
+            state_data=("purchase_orders", "updated"),
+        ),
+        SOSEndpoint(
+            name="adjustments",
+            path="/adjustment/",
+            state_data=("adjustments", "updated"),
+        ),
+        SOSEndpoint(
+            name="returns",
+            path="/return/",
+            state_data=("returns", "updated"),
+        ),
+        SOSEndpoint(
+            name="rmas",
+            path="/rma/",
+            state_data=("rmas", "updated"),
+        ),
+        # SOSEndpoint(
+        #     name="new_items",
+        #     path="/item/",
+        #     state_data=("items", "new")),
+        # SOSEndpoint(
+        #     name="new_item_receipts",
+        #     path="/itemreceipt/",
+        #     state_data=("item_receipts", "new"),
+        # ),
+        # SOSEndpoint(
+        #     name="new_shipments",
+        #     path="/shipment/",
+        #     state_data=("shipments", "new")
+        # ),
+        # SOSEndpoint(
+        #     name="new_invoices",
+        #     path="/invoice/",
+        #     state_data=("invoices", "new")
+        # ),
+        # SOSEndpoint(
+        #     name="new_sales_orders",
+        #     path="/salesorder/",
+        #     state_data=("sales_orders", "new"),
+        # ),
     )
 
     SOS_RECORD_TYPES: ClassVar[dict[str, Any]] = {
@@ -169,6 +184,9 @@ class SosSettings(AppBaseSettings):
         if endpoint.state_data and endpoint.state_data[1] == "new":
             return {"createdsince": watermark}
 
+        if endpoint.state_data and endpoint.state_data[1] == "all":
+            return {"from": watermark}
+        
         return {}
 
     @classmethod
