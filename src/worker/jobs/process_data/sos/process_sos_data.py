@@ -20,7 +20,17 @@ from src.database.models.sos_models import *
 logger = logging.getLogger(__name__)
 
 PayloadType = Literal[
-    "sales_order", "invoice", "shipment", "item_receipt", "item", "purchase_order"
+    "sales_order",
+    "invoice",
+    "shipment",
+    "item_receipt",
+    "item",
+    "purchase_order",
+    "sales_receipts",
+    "estimates",
+    "adjustments",
+    "returns",
+    "rmas",
 ]
 
 SosRootRecord: TypeAlias = (
@@ -30,6 +40,12 @@ SosRootRecord: TypeAlias = (
     | SosItemReceiptHeader
     | SosItem
     | SosPurchaseOrderHeader
+    | SosSalesReceiptHeader
+    | SosEstimateHeader
+    | SosReturnHeader
+    | SosRmaHeader
+    | SosPaymentHeader
+    | SosAdjustmentHeader
 )
 
 SOS_ENTITY_TYPES: dict[str, PayloadType] = {
@@ -39,6 +55,11 @@ SOS_ENTITY_TYPES: dict[str, PayloadType] = {
     "updated_item_receipts": "item_receipt",
     "updated_items": "item",
     "updated_purchase_orders": "purchase_order",
+    "sales_receipts": "sales_receipts",
+    "estimates": "estimates",
+    "adjustments": "adjustments",
+    "returns": "returns",
+    "rmas": "rmas",
 }
 
 PAYLOAD_MODELS: dict[PayloadType, type[SosRootRecord]] = {
@@ -48,6 +69,11 @@ PAYLOAD_MODELS: dict[PayloadType, type[SosRootRecord]] = {
     "item_receipt": SosItemReceiptHeader,
     "item": SosItem,
     "purchase_order": SosPurchaseOrderHeader,
+    "sales_receipts": SosSalesReceiptHeader,
+    "estimates": SosEstimateHeader,
+    "adjustments": SosAdjustmentHeader,
+    "returns": SosReturnHeader,
+    "rmas": SosRmaHeader,
 }
 
 
