@@ -86,7 +86,7 @@ class AcendaSettings(AppBaseSettings):
         return {}
 
     @classmethod
-    def get_acenda_watermark(cls, file_path: Path, endpoint: AcendaEndpoint) -> str | None:
+    def get_acenda_watermark(cls, file_path: Path, endpoint: AcendaEndpoint) -> str:
 
         one_day_back = cls.acenda_timestamp_format(datetime.now(timezone.utc) - timedelta(days=1))
 
@@ -96,13 +96,16 @@ class AcendaSettings(AppBaseSettings):
             
             state_dict_dt = acenda_state._state[endpoint.state_data[0]][endpoint.state_data[1]]
 
-            if state_dict_dt:
+            if isinstance(state_dict_dt, str) and state_dict_dt.strip():
                 return state_dict_dt
 
             with open(file_path, "r", encoding="utf-8") as f:
                 data: dict = json.load(f)
             watermark = data[endpoint.state_data[0]][endpoint.state_data[1]]
-            return watermark
+            if isinstance(watermark, str) and watermark.strip():
+                return watermark
+
+            return one_day_back
         
         except:
             return one_day_back
