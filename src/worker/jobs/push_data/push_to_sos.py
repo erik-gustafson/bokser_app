@@ -45,8 +45,11 @@ class AcendaOrderPush:
     LOOKBACK_DAYS = 1
     MKT_START_DATE = datetime(
         2026,
-        6,
+        5,
         1,
+        5,
+        0,
+        0,
         tzinfo=timezone.utc,
     )
 
@@ -114,17 +117,17 @@ class AcendaOrderPush:
                     rows=sync_rows,
                 )
 
-                tasks = [
-                    self._post_to_sos_and_log(mapped_order=order)
-                    for order in mapped_orders
-                ]
+        tasks = [
+            self._post_to_sos_and_log(mapped_order=order)
+            for order in mapped_orders
+        ]
 
-                results = await asyncio.gather(*tasks)
-                for result, error in results:
-                    if result:
-                        print("YAY")
-                    if error:
-                        print("Boo")
+        results = await asyncio.gather(*tasks)
+        for result, error in results:
+            if result:
+                print("YAY")
+            if error:
+                print("Boo")
 
     async def _post_to_sos_and_log(self, mapped_order: SosSalesOrderCreate):
 

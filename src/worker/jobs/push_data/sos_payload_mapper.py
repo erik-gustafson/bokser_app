@@ -192,7 +192,7 @@ class SosSalesOrderPayloadMapper:
         order_stage = self._set_order_stage(order.sales_channel_id)
 
         return SosSalesOrderCreate(
-            number=str(order.order_number),
+            number=str(order.id),
             date=settings.sos_timestamp_format(order.ordered_at),
             customer=sos_customer_dict,
             location=settings.sos_ksp_location_dict,
@@ -262,7 +262,7 @@ class SosSalesOrderPayloadMapper:
             quantity=line.quantity,
             unit_price=line.unit_price,
             uom=settings.sos_uom_ea_dict,
-            amount=line.total_price,
+            amount=(line.quantity * line.unit_price),
             due_date=due_date,
             tax=taxable,
         )

@@ -81,40 +81,38 @@ async def sync_endpoints_job(
             records = result.records
             successful_endpoints += 1
 
-            if not records:
-                continue
+            if records:
+                write_result = raw_writer.write_json_payload(
+                    source_system=source_name,
+                    entity_name=endpoint_name,
+                    payload=records,
+                )
 
-            write_result = raw_writer.write_json_payload(
-                source_system=source_name,
-                entity_name=endpoint_name,
-                payload=records,
-            )
+                async with async_session() as session:
 
-            async with async_session() as session:
-
-                async with session.begin():
-                    session.add(
-                        DataLakeFile(
-                            source_name=source_name,
-                            entity_name=endpoint_name,
-                            file_path=str(write_result.file_path),
-                            file_name=write_result.file_name,
-                            record_count=write_result.record_count,
-                            file_size_bytes=write_result.file_size_bytes,
-                            sha256=write_result.sha256,
-                            landed_at=write_result.written_at_utc,
-                            status="LANDED",
+                    async with session.begin():
+                        session.add(
+                            DataLakeFile(
+                                source_name=source_name,
+                                entity_name=endpoint_name,
+                                file_path=str(write_result.file_path),
+                                file_name=write_result.file_name,
+                                record_count=write_result.record_count,
+                                file_size_bytes=write_result.file_size_bytes,
+                                sha256=write_result.sha256,
+                                landed_at=write_result.written_at_utc,
+                                status="LANDED",
+                            )
                         )
-                    )
 
-            total_records += write_result.record_count
+                total_records += write_result.record_count
 
-            logger.info(
-                f"Fetched and wrote {source_name} endpoint=%s records=%s file=%s",
-                endpoint.name,
-                write_result.record_count,
-                write_result.file_path,
-            )
+                logger.info(
+                    f"Fetched and wrote {source_name} endpoint=%s records=%s file=%s",
+                    endpoint.name,
+                    write_result.record_count,
+                    write_result.file_path,
+                )
 
             await target_source_data.update_state_file(
                 state_type=endpoint_name, records=records

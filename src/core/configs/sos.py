@@ -76,9 +76,9 @@ class SosSettings(AppBaseSettings):
             state_data=("sales_receipts", "updated"),
         ),
         SOSEndpoint(
-            name="estiamtes",
+            name="estimates",
             path="/estimate/",
-            state_data=("estiamtes", "updated"),
+            state_data=("estimates", "updated"),
         ),
         SOSEndpoint(
             name="updated_invoices",

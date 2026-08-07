@@ -31,6 +31,7 @@ PayloadType = Literal[
     "adjustments",
     "returns",
     "rmas",
+    "payments",
 ]
 
 SosRootRecord: TypeAlias = (
@@ -55,11 +56,13 @@ SOS_ENTITY_TYPES: dict[str, PayloadType] = {
     "updated_item_receipts": "item_receipt",
     "updated_items": "item",
     "updated_purchase_orders": "purchase_order",
+    "purchase_orders": "purchase_order",
     "sales_receipts": "sales_receipts",
     "estimates": "estimates",
     "adjustments": "adjustments",
     "returns": "returns",
     "rmas": "rmas",
+    "payments": "payments",
 }
 
 PAYLOAD_MODELS: dict[PayloadType, type[SosRootRecord]] = {
@@ -74,6 +77,7 @@ PAYLOAD_MODELS: dict[PayloadType, type[SosRootRecord]] = {
     "adjustments": SosAdjustmentHeader,
     "returns": SosReturnHeader,
     "rmas": SosRmaHeader,
+    "payments": SosPaymentHeader,
 }
 
 
@@ -172,6 +176,13 @@ def _add_reference(
             values[f"{prefix}_fullname"] = reference.get("fullname")
     elif isinstance(reference, str):
         values[f"{prefix}_name"] = reference
+
+
+def _add_payment_method(values: dict[str, Any], reference: Any) -> None:
+    _add_reference(values, "payment_method", reference)
+    if isinstance(reference, dict):
+        values["payment_method_sync_token"] = reference.get("syncToken")
+        values["payment_method_sos_pay_type"] = reference.get("sosPayType")
 
 
 def _add_address(values: dict[str, Any], prefix: str, source: Any) -> None:
@@ -467,6 +478,20 @@ class SosPayloadMapper:
             return self.map_item_receipt(data)
         if payload_type == "item":
             return self.map_item(data)
+        if payload_type == "purchase_order":
+            return self.map_purchase_order(data)
+        if payload_type == "sales_receipts":
+            return self.map_sales_receipt(data)
+        if payload_type == "estimates":
+            return self.map_estimate(data)
+        if payload_type == "adjustments":
+            return self.map_adjustment(data)
+        if payload_type == "returns":
+            return self.map_return(data)
+        if payload_type == "rmas":
+            return self.map_rma(data)
+        if payload_type == "payments":
+            return self.map_payment(data)
         raise ValueError(f"Unsupported SOS payload type: {payload_type}")
 
     def map_sales_order(self, data: dict[str, Any]) -> SosSalesOrderHeader:
@@ -626,6 +651,269 @@ class SosPayloadMapper:
         ]
         return item
 
+    def map_purchase_order(self, data: dict[str, Any]) -> SosPurchaseOrderHeader:
+        values = _model_values(SosPurchaseOrderHeader, data)
+        _add_reference(values, "vendor", data.get("vendor"))
+        _add_reference(
+            values,
+            "customer",
+            data.get("customer"),
+            include_fullname=True,
+        )
+        for prefix in (
+            "location",
+            "terms",
+            "currency",
+            "tax_code",
+            "shipping_method",
+        ):
+            _add_reference(values, prefix, data.get(_snake_to_camel(prefix)))
+        _add_address(values, "billing", data.get("billing"))
+        _add_address(values, "shipping", data.get("shipping"))
+
+        header = SosPurchaseOrderHeader(**values)
+        purchase_order_id = as_int(data.get("id"))
+        header.lines = [
+            self._map_line(
+                SosPurchaseOrderLine,
+                SosPurchaseOrderLineLinkedTransactions,
+                "purchase_order_id",
+                "purchase_order_line_id",
+                purchase_order_id,
+                line,
+            )
+            for line in _iter_dicts(data.get("lines"))
+        ]
+        header.custom_fields = self._map_custom_fields(
+            SosPurchaseOrderCustomField,
+            "purchase_order_id",
+            purchase_order_id,
+            data.get("customFields"),
+        )
+        header.linked_transactions = self._map_header_transactions(
+            SosPurchaseOrderHeaderLinkedTransactions,
+            "purchase_order_id",
+            purchase_order_id,
+            data,
+            collection_keys=("linkedReceipts",),
+        )
+        return header
+
+    def map_sales_receipt(self, data: dict[str, Any]) -> SosSalesReceiptHeader:
+        values = _model_values(SosSalesReceiptHeader, data)
+        self._add_common_customer_header(values, data, include_location=True)
+        _add_payment_method(values, data.get("paymentMethod"))
+        for prefix in (
+            "deposit_account",
+            "channel",
+            "priority",
+            "order_stage",
+            "shipping_method",
+        ):
+            _add_reference(values, prefix, data.get(_snake_to_camel(prefix)))
+
+        header = SosSalesReceiptHeader(**values)
+        sales_receipt_id = as_int(data.get("id"))
+        header.lines = [
+            self._map_line(
+                SosSalesReceiptLine,
+                SosSalesReceiptLineLinkedTransactions,
+                "sales_receipt_id",
+                "sales_receipt_line_id",
+                sales_receipt_id,
+                line,
+            )
+            for line in _iter_dicts(data.get("lines"))
+        ]
+        header.custom_fields = self._map_custom_fields(
+            SosSalesReceiptCustomField,
+            "sales_receipt_id",
+            sales_receipt_id,
+            data.get("customFields"),
+        )
+        header.linked_transactions = self._map_header_transactions(
+            SosSalesReceiptHeaderLinkedTransactions,
+            "sales_receipt_id",
+            sales_receipt_id,
+            data,
+        )
+        return header
+
+    def map_estimate(self, data: dict[str, Any]) -> SosEstimateHeader:
+        values = _model_values(SosEstimateHeader, data)
+        self._add_common_customer_header(values, data)
+        _add_reference(values, "channel", data.get("channel"))
+
+        header = SosEstimateHeader(**values)
+        estimate_id = as_int(data.get("id"))
+        header.lines = [
+            self._map_line(
+                SosEstimateLine,
+                SosEstimateLineLinkedTransactions,
+                "estimate_id",
+                "estimate_line_id",
+                estimate_id,
+                line,
+            )
+            for line in _iter_dicts(data.get("lines"))
+        ]
+        header.custom_fields = self._map_custom_fields(
+            SosEstimateCustomField,
+            "estimate_id",
+            estimate_id,
+            data.get("customFields"),
+        )
+        header.linked_transactions = self._map_header_transactions(
+            SosEstimateHeaderLinkedTransactions,
+            "estimate_id",
+            estimate_id,
+            data,
+        )
+        return header
+
+    def map_adjustment(self, data: dict[str, Any]) -> SosAdjustmentHeader:
+        values = _model_values(SosAdjustmentHeader, data)
+        _add_reference(values, "account", data.get("account"))
+        _add_reference(values, "location", data.get("location"))
+
+        header = SosAdjustmentHeader(**values)
+        adjustment_id = as_int(data.get("id"))
+        header.lines = [
+            self._map_adjustment_line(adjustment_id, line)
+            for line in _iter_dicts(data.get("lines"))
+        ]
+        header.custom_fields = self._map_custom_fields(
+            SosAdjustmentCustomField,
+            "adjustment_id",
+            adjustment_id,
+            data.get("customFields"),
+        )
+        return header
+
+    def map_return(self, data: dict[str, Any]) -> SosReturnHeader:
+        values = _model_values(SosReturnHeader, data)
+        _add_reference(
+            values,
+            "customer",
+            data.get("customer"),
+            include_fullname=True,
+        )
+        for prefix in ("currency", "location", "channel", "shipping_method"):
+            _add_reference(values, prefix, data.get(_snake_to_camel(prefix)))
+
+        header = SosReturnHeader(**values)
+        return_id = as_int(data.get("id"))
+        header.lines = [
+            self._map_line(
+                SosReturnLine,
+                SosReturnLineLinkedTransactions,
+                "return_id",
+                "return_line_id",
+                return_id,
+                line,
+            )
+            for line in _iter_dicts(data.get("lines"))
+        ]
+        header.custom_fields = self._map_custom_fields(
+            SosReturnCustomField,
+            "return_id",
+            return_id,
+            data.get("customFields"),
+        )
+        header.linked_transactions = self._map_header_transactions(
+            SosReturnHeaderLinkedTransactions,
+            "return_id",
+            return_id,
+            data,
+        )
+        return header
+
+    def map_rma(self, data: dict[str, Any]) -> SosRmaHeader:
+        values = _model_values(SosRmaHeader, data)
+        _add_reference(
+            values,
+            "customer",
+            data.get("customer"),
+            include_fullname=True,
+        )
+        for prefix in ("location", "channel", "shipping_method"):
+            _add_reference(values, prefix, data.get(_snake_to_camel(prefix)))
+        _add_address(values, "billing", data.get("billing"))
+        _add_address(values, "shipping", data.get("shipping"))
+
+        header = SosRmaHeader(**values)
+        rma_id = as_int(data.get("id"))
+        header.lines = [
+            self._map_line(
+                SosRmaLine,
+                SosRmaLineLinkedTransactions,
+                "rma_id",
+                "rma_line_id",
+                rma_id,
+                line,
+            )
+            for line in _iter_dicts(data.get("lines"))
+        ]
+        header.custom_fields = self._map_custom_fields(
+            SosRmaCustomField,
+            "rma_id",
+            rma_id,
+            data.get("customFields"),
+        )
+        header.linked_transactions = self._map_header_transactions(
+            SosRmaHeaderLinkedTransactions,
+            "rma_id",
+            rma_id,
+            data,
+        )
+        return header
+
+    def map_payment(self, data: dict[str, Any]) -> SosPaymentHeader:
+        values = _model_values(SosPaymentHeader, data)
+        _add_reference(
+            values,
+            "customer",
+            data.get("customer"),
+            include_fullname=True,
+        )
+        _add_payment_method(values, data.get("paymentMethod"))
+        for prefix in (
+            "location",
+            "currency",
+            "channel",
+            "deposit_account",
+            "class",
+        ):
+            _add_reference(values, prefix, data.get(_snake_to_camel(prefix)))
+        _add_address(values, "billing", data.get("billing"))
+
+        header = SosPaymentHeader(**values)
+        payment_id = as_int(data.get("id"))
+        header.lines = [
+            self._map_line(
+                SosPaymentLine,
+                SosPaymentLineLinkedTransactions,
+                "payment_id",
+                "payment_line_id",
+                payment_id,
+                line,
+            )
+            for line in _iter_dicts(data.get("lines"))
+        ]
+        header.custom_fields = self._map_custom_fields(
+            SosPaymentCustomField,
+            "payment_id",
+            payment_id,
+            data.get("customFields"),
+        )
+        header.linked_transactions = self._map_header_transactions(
+            SosPaymentHeaderLinkedTransactions,
+            "payment_id",
+            payment_id,
+            data,
+        )
+        return header
+
     def _add_common_customer_header(
         self,
         values: dict[str, Any],
@@ -761,6 +1049,18 @@ class SosPayloadMapper:
         _add_reference(values, "vendor", data.get("vendor"))
         _add_reference(values, "class", data.get("class"))
         return SosItemReceiptOtherCost(**values)
+
+    def _map_adjustment_line(
+        self,
+        adjustment_id: int,
+        data: dict[str, Any],
+    ) -> SosAdjustmentLine:
+        values = _model_values(SosAdjustmentLine, data)
+        values["adjustment_id"] = adjustment_id
+        _add_reference(values, "item", data.get("item"))
+        _add_reference(values, "class", data.get("class"))
+        _add_reference(values, "uom", data.get("uom"))
+        return SosAdjustmentLine(**values)
 
     def _map_uom(self, item_id: int, data: dict[str, Any]) -> SosItemUom:
         values = _model_values(SosItemUom, data)
