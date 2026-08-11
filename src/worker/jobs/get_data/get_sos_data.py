@@ -16,6 +16,8 @@ from src.worker.jobs.get_data.base_get import EndpointFetchResult
 
 logger = logging.getLogger(__name__)
 
+SOS_QUERY_TIMESTAMP_PARAMS = frozenset({"updatedsince", "createdsince", "from"})
+
 
 class GetSosData:
     """
@@ -98,6 +100,7 @@ class GetSosData:
     ) -> list[dict[str, Any]]:
         path = endpoint.path
 
+        endpoint_params = self._normalize_query_timestamps(endpoint_params)
         base_params = {
             **endpoint_params,
             "maxresults": max_results,
@@ -153,6 +156,31 @@ class GetSosData:
                 logger.exception("Error fetching SOS page for path=%s", path)
 
         return records
+
+    @staticmethod
+    def _normalize_query_timestamps(params: dict[str, Any]) -> dict[str, Any]:
+        normalized = dict(params)
+
+        for name in SOS_QUERY_TIMESTAMP_PARAMS:
+            value = normalized.get(name)
+            if not isinstance(value, str):
+                continue
+
+            timestamp = value.strip()
+            if timestamp.endswith(("Z", "z")):
+                timestamp = f"{timestamp[:-1]}+00:00"
+
+            parsed = datetime.fromisoformat(timestamp)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            else:
+                parsed = parsed.astimezone(timezone.utc)
+
+            normalized[name] = parsed.isoformat(timespec="seconds").replace(
+                "+00:00", "Z"
+            )
+
+        return normalized
 
     async def iter_endpoint_data(
         self, *, max_concurrency: int = 3, interval_ms: int = 501
