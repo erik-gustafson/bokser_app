@@ -171,7 +171,7 @@ class SosSalesOrderPayloadMapper:
         ]
 
         shipping_amount = sum([x.total_handling_price for x in order.items])
-        discount_amount = sum([x.total_item_discount for x in order.items])
+        discount_amount = -abs(sum([x.total_item_discount for x in order.items]))
         tax_amount = sum([x.total_item_tax for x in order.items])
 
         if order.sales_channel_name:

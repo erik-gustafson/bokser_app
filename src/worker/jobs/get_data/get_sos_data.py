@@ -29,7 +29,7 @@ class GetSosData:
         self.sos_client = sos_client or SOSClient()
         self._owns_sos_client = sos_client is None
         self._open_depth = 0
-        self.run_started_at = settings.sos_timestamp_format(None)
+        self.run_started_at = settings.sos_timestamp_format(dt=None, tz="utc")
         self.state_file: Path = (
             settings.lake_root
             / "raw"

@@ -11,8 +11,7 @@ from .base import AppBaseSettings
 
 from src.storage.states.state_store import sos_state
 
-CENTRAL_TZ = ZoneInfo("America/Chicago")
-UTC_TZ = ZoneInfo("UTC")
+TIMEZONE_DICT = {"cst": ZoneInfo("America/Chicago"), "utc": ZoneInfo("UTC")}
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,7 +193,7 @@ class SosSettings(AppBaseSettings):
         cls, file_path: Path, endpoint: SOSEndpoint
     ) -> str | None:
 
-        one_day_back = cls.sos_timestamp_format( datetime.now(timezone.utc) - timedelta(days=1))
+        one_day_back = cls.sos_timestamp_format(dt=datetime.now(timezone.utc) - timedelta(days=1), tz="utc")
         try:
             if not endpoint.name:
                 raise Exception
@@ -218,24 +217,31 @@ class SosSettings(AppBaseSettings):
         cls,
         dt: date | datetime | None,
         *,
+        tz: str | None = None,
         midnight: bool = False,
     ) -> str:
+
+        if not tz:
+            tz = "cst"
+
+        zone_info = TIMEZONE_DICT.get(tz)
+        
         if dt is None:
-            value = datetime.now(CENTRAL_TZ)
+            value = datetime.now(zone_info)
 
         elif isinstance(dt, datetime):
             if dt.tzinfo is None:
                 # Treat a naive datetime as Central time.
-                value = dt.replace(tzinfo=CENTRAL_TZ)
+                value = dt.replace(tzinfo=zone_info)
             else:
                 # Convert the actual instant into Central time.
-                value = dt.astimezone(CENTRAL_TZ)
+                value = dt.astimezone(zone_info)
 
         else:
             value = datetime.combine(
                 dt,
                 time.min,
-                tzinfo=CENTRAL_TZ,
+                tzinfo=zone_info,
             )
 
         if midnight:

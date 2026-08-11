@@ -22,10 +22,11 @@ import asyncio
 from collections.abc import AsyncIterator
 from typing import Any
 
-sos_endpoint = SOSEndpoint(
+SOS_ENDPOINT = SOSEndpoint(
     name="get_sos_data",
     path="/salesorder/",
 )
+CUSTOMER = "Target.com DTC"
 
 
 async def main() -> None:
@@ -37,10 +38,10 @@ async def main() -> None:
 
 async def get_sos_ids() -> list[int]:
 
-    params = {"query": "Bed Bath and Beyond DTC"}
+    params = {"query": CUSTOMER}
 
     result = await get_sos_data._get_raw_sos_data_with_open_client(
-        endpoint=sos_endpoint,
+        endpoint=SOS_ENDPOINT,
         endpoint_params=params,
         archived="any",
         max_concurrency=10,
@@ -71,7 +72,7 @@ async def delete_sos_ids(
         async with semaphore:
             try:
                 response = await sos_client.delete(
-                    path_or_url=f"https://api.sosinventory.com/api/v2{sos_endpoint.path}batch",
+                    path_or_url=f"https://api.sosinventory.com/api/v2{SOS_ENDPOINT.path}batch",
                     json_data=data,
                 )
                 if 200 <= response.status_code < 300:

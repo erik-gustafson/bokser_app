@@ -51,7 +51,7 @@ if __name__ == "__main__":
     #     data_type="new_orders",
     # )
 
-    asyncio.run(warmup_tokens())
-    asyncio.run(warmup_state_files())
-    asyncio.run(acenda_main())
-    asyncio.run(sos_main())
+    # asyncio.run(warmup_tokens())
+    # asyncio.run(warmup_state_files())
+    # asyncio.run(acenda_main())
+    # asyncio.run(sos_main())
