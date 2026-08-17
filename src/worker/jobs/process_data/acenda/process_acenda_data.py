@@ -58,10 +58,15 @@ def as_int(value: Any) -> int:
 
 
 def _acenda_payload_type_from_entity(entity_name: str) -> PayloadType:
-    if entity_name in {"new_orders", "updated_orders", "all_orders"}:
+    if entity_name in {"new_orders", "updated_orders", "all_orders", "acenda_orders"}:
         return "order"
 
-    if entity_name in {"new_ship_advices", "updated_ship_advices", "all_ship_advices"}:
+    if entity_name in {
+        "new_ship_advices",
+        "updated_ship_advices",
+        "all_ship_advices",
+        "acenda_ship_advices",
+    }:
         return "ship_advice"
 
     raise ValueError(f"Unsupported Acenda entity_name: {entity_name}")
@@ -76,13 +81,11 @@ async def acenda_load_to_db() -> None:
     order_entities = [
         "new_orders",
         "updated_orders",
-        "all_orders",
     ]
 
     ship_advice_entities = [
         "new_ship_advices",
         "updated_ship_advices",
-        "all_ship_advices",
     ]
 
     total_results = []

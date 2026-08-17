@@ -36,10 +36,14 @@ class AcendaSettings(AppBaseSettings):
     }
 
     ACENDA_ENDPOINTS: ClassVar[tuple[AcendaEndpoint, ...]] = (
-        AcendaEndpoint(name="new_orders", path="/order", params={"query":{"created_at":{"$gt":None}}}, state_data=("new_orders", "last_created_at"), data_type="new"),
-        AcendaEndpoint(name="updated_orders", path="/order", params={"query":{"updated_at":{"$gt":None}}}, state_data=("updated_orders", "last_updated_at"), data_type="update"),
-        AcendaEndpoint(name="new_ship_advices", path="/ship_advice", params={"query":{"created_at":{"$gt":None}}}, state_data=("new_ship_advices", "last_created_at"), data_type="new"),
-        AcendaEndpoint(name="updated_ship_advices", path="/ship_advice", params={"query":{"updated_at":{"$gt":None}}}, state_data=("updated_ship_advices", "last_updated_at"), data_type="update"),
+        # AcendaEndpoint(name="new_orders", path="/order", params={"query":{"created_at":{"$gt":None}}}, state_data=("new_orders", "last_created_at"), data_type="new"),
+        # AcendaEndpoint(name="updated_orders", path="/order", params={"query":{"updated_at":{"$gt":None}}}, state_data=("updated_orders", "last_updated_at"), data_type="update"),
+        # AcendaEndpoint(name="new_ship_advices", path="/ship_advice", params={"query":{"created_at":{"$gt":None}}}, state_data=("new_ship_advices", "last_created_at"), data_type="new"),
+        # AcendaEndpoint(name="updated_ship_advices", path="/ship_advice", params={"query":{"updated_at":{"$gt":None}}}, state_data=("updated_ship_advices", "last_updated_at"), data_type="update"),
+        AcendaEndpoint(name="acenda_orders", path="/order", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_orders", "last_updated_at"), data_type="update"),
+        AcendaEndpoint(name="acenda_ship_advices", path="/ship_advice", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_ship_advices", "last_updated_at"), data_type="update"),
+        AcendaEndpoint(name="acenda_fulfillments", path="/fulfillment", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_fulfillments", "last_updated_at"), data_type="update"),
+        AcendaEndpoint(name="acenda_returns", path="/return", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_returns", "last_updated_at"), data_type="update"),
     )
 # fmt: on
     @classmethod
@@ -63,7 +67,7 @@ class AcendaSettings(AppBaseSettings):
 
         watermark = (cls.get_acenda_watermark(file_path=file_path, endpoint=endpoint))
 
-        if endpoint.name in ["new_orders", "new_ship_advices"]:
+        if endpoint.data_type == "new":
                         
             return {
                 "query": json.dumps({
@@ -73,7 +77,8 @@ class AcendaSettings(AppBaseSettings):
                 })
             }
 
-        if endpoint.name in ["updated_orders", "updated_ship_advices"]:
+
+        if endpoint.data_type == "update":
                         
             return {
                 "query": json.dumps({
