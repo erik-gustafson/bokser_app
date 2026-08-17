@@ -20,6 +20,10 @@ class AcendaEndpoint:
     enabled: bool = True
 
 
+"""
+
+"""
+
 # fmt: off
 class AcendaSettings(AppBaseSettings):
     acenda_api_url: str = "https://api.acenda.io/v1"
@@ -43,7 +47,9 @@ class AcendaSettings(AppBaseSettings):
         AcendaEndpoint(name="acenda_orders", path="/order", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_orders", "last_updated_at"), data_type="update"),
         AcendaEndpoint(name="acenda_ship_advices", path="/ship_advice", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_ship_advices", "last_updated_at"), data_type="update"),
         AcendaEndpoint(name="acenda_fulfillments", path="/fulfillment", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_fulfillments", "last_updated_at"), data_type="update"),
-        AcendaEndpoint(name="acenda_returns", path="/return", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_returns", "last_updated_at"), data_type="update"),
+        AcendaEndpoint(name="acenda_returns", path="/return_extended", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_returns", "last_updated_at"), data_type="update"),
+        AcendaEndpoint(name="acenda_channel_item_status", path="/channel_item_status", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_channel_item_status", "last_updated_at"), data_type="update"),
+        AcendaEndpoint(name="acenda_catalog", path="/catalog", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_catalog", "last_updated_at"), data_type="update"),
     )
 # fmt: on
     @classmethod
