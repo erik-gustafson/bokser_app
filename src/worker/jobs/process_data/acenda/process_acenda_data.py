@@ -78,14 +78,12 @@ def _acenda_payload_type_from_entity(entity_name: str) -> PayloadType:
 
 
 async def acenda_load_to_db() -> None:
-    order_entities = [
-        "new_orders",
-        "updated_orders",
-    ]
+    order_entities = ["new_orders", "updated_orders", "acenda_orders"]
 
     ship_advice_entities = [
         "new_ship_advices",
         "updated_ship_advices",
+        "acenda_ship_advices",
     ]
 
     total_results = []
