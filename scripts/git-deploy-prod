@@ -24,9 +24,21 @@ require_remote origin
 require_remote production
 
 git fetch origin main dev
+git fetch production main
 
 MAIN_SHA="$(git rev-parse --verify refs/remotes/origin/main^{commit})"
 DEV_SHA="$(git rev-parse --verify refs/remotes/origin/dev^{commit})"
+PRODUCTION_SHA="$(git rev-parse --verify refs/remotes/production/main^{commit})"
+
+if ! git merge-base --is-ancestor "$MAIN_SHA" "$DEV_SHA"; then
+  echo "Cannot fast-forward origin/main to origin/dev. Merge origin/main into dev first." >&2
+  exit 1
+fi
+
+if ! git merge-base --is-ancestor "$PRODUCTION_SHA" "$DEV_SHA"; then
+  echo "Cannot fast-forward production/main to origin/dev. Reconcile production/main into dev first." >&2
+  exit 1
+fi
 
 echo "Promoting origin/dev (${DEV_SHA}) onto origin/main (${MAIN_SHA}) via fast-forward only."
 TMP_WORKTREE="$ROOT_DIR/.tmp/deploy-prod-worktree-$$"
@@ -44,4 +56,3 @@ echo "Promoted SHA: $PROMOTED_SHA"
 git push origin "${PROMOTED_SHA}:refs/heads/main"
 git push production "${PROMOTED_SHA}:refs/heads/main"
 echo "Production deploy push complete."
-
