@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 from typing import Any, ClassVar, Tuple
 from pathlib import Path
 from .base import AppBaseSettings
-
+from src.database.database import Base
+from src.database.models import AcendaOrderHeaders
 from src.storage.states.state_store import acenda_state
 
 
@@ -14,15 +15,11 @@ from src.storage.states.state_store import acenda_state
 class AcendaEndpoint:
     name: str
     path: str
-    data_type: str
+    payload_type: str
     params: dict[str, Any] = field(default_factory=dict)
     state_data: Tuple[str, ...] | None = None
     enabled: bool = True
 
-
-"""
-
-"""
 
 # fmt: off
 class AcendaSettings(AppBaseSettings):
@@ -40,17 +37,20 @@ class AcendaSettings(AppBaseSettings):
     }
 
     ACENDA_ENDPOINTS: ClassVar[tuple[AcendaEndpoint, ...]] = (
-        # AcendaEndpoint(name="new_orders", path="/order", params={"query":{"created_at":{"$gt":None}}}, state_data=("new_orders", "last_created_at"), data_type="new"),
-        # AcendaEndpoint(name="updated_orders", path="/order", params={"query":{"updated_at":{"$gt":None}}}, state_data=("updated_orders", "last_updated_at"), data_type="update"),
-        # AcendaEndpoint(name="new_ship_advices", path="/ship_advice", params={"query":{"created_at":{"$gt":None}}}, state_data=("new_ship_advices", "last_created_at"), data_type="new"),
-        # AcendaEndpoint(name="updated_ship_advices", path="/ship_advice", params={"query":{"updated_at":{"$gt":None}}}, state_data=("updated_ship_advices", "last_updated_at"), data_type="update"),
-        AcendaEndpoint(name="acenda_orders", path="/order", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_orders", "last_updated_at"), data_type="update"),
-        AcendaEndpoint(name="acenda_ship_advices", path="/ship_advice", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_ship_advices", "last_updated_at"), data_type="update"),
-        AcendaEndpoint(name="acenda_fulfillments", path="/fulfillment", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_fulfillments", "last_updated_at"), data_type="update"),
-        AcendaEndpoint(name="acenda_returns", path="/return_extended", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_returns", "last_updated_at"), data_type="update"),
-        AcendaEndpoint(name="acenda_channel_item_status", path="/channel_item_status", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_channel_item_status", "last_updated_at"), data_type="update"),
-        AcendaEndpoint(name="acenda_catalog", path="/catalog", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_catalog", "last_updated_at"), data_type="update"),
+        AcendaEndpoint(name="acenda_orders", path="/order", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_orders", "last_updated_at"), payload_type="order"),
+        AcendaEndpoint(name="acenda_ship_advices", path="/ship_advice", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_ship_advices", "last_updated_at"), payload_type="ship_advice"),
+        AcendaEndpoint(name="acenda_fulfillments", path="/fulfillment", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_fulfillments", "last_updated_at"), payload_type="fulfillment"),
+        AcendaEndpoint(name="acenda_returns", path="/return_extended", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_returns", "last_updated_at"), payload_type="return"),
+        AcendaEndpoint(name="acenda_channel_item_status", path="/channel_item_status", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_channel_item_status", "last_updated_at"), payload_type="channel_item_status"),
+        AcendaEndpoint(name="acenda_catalog", path="/catalog", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_catalog", "last_updated_at"), payload_type="catalog"),
     )
+
+    ENDPOINT_BY_NAME: ClassVar[dict[str, AcendaEndpoint]] = {
+        endpoint.name: endpoint
+        for endpoint in ACENDA_ENDPOINTS
+    }
+
+
 # fmt: on
     @classmethod
     def acenda_enabled_endpoints(cls) -> tuple[AcendaEndpoint, ...]:
@@ -65,36 +65,37 @@ class AcendaSettings(AppBaseSettings):
         return [endpoint.name for endpoint in cls.acenda_enabled_endpoints()]
 
     @classmethod
+    def acenda_endpoints_as_dict(cls, name: str) -> AcendaEndpoint:
+        try:
+            return cls.ENDPOINT_BY_NAME[name]
+        except KeyError:
+            raise ValueError(f"Invalid Acenda endpoint {name}") from None
+
+    @classmethod
+    def acenda_payload_type(cls, name: str):
+        try:
+            endpoint_dict = cls.acenda_endpoints_as_dict(name)
+            return endpoint_dict.payload_type
+        except:
+            raise ValueError(f"Payload Type not set for {name}")
+
+    @classmethod
     def get_acenda_endpoint_params(
         cls,
         file_path: Path,
         endpoint: AcendaEndpoint,
-    ) -> dict:
+    ) -> dict[str,str]:
 
         watermark = (cls.get_acenda_watermark(file_path=file_path, endpoint=endpoint))
-
-        if endpoint.data_type == "new":
                         
-            return {
-                "query": json.dumps({
-                    "created_at": {
-                        "$gt": watermark
-                    }
-                })
-            }
+        return {
+            "query": json.dumps({
+                "updated_at": {
+                    "$gt": watermark
+                }
+            })
+        }
 
-
-        if endpoint.data_type == "update":
-                        
-            return {
-                "query": json.dumps({
-                    "updated_at": {
-                        "$gt": watermark
-                    }
-                })
-            }
-
-        return {}
 
     @classmethod
     def get_acenda_watermark(cls, file_path: Path, endpoint: AcendaEndpoint) -> str:

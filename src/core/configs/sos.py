@@ -153,6 +153,24 @@ class SosSettings(AppBaseSettings):
         "updated": "last_run_at",
         "created": "last_run_at",
     }
+
+    ENDPOINT_BY_NAME: ClassVar[dict[str, SOSEndpoint]] = {
+        endpoint.name: endpoint
+        for endpoint in SOS_ENDPOINTS
+    }
+
+    @classmethod
+    def get_endpoint(cls, name: str) -> SOSEndpoint:
+        try:
+            return cls.ENDPOINT_BY_NAME[name]
+        except KeyError:
+            valid_names = ", ".join(cls.ENDPOINT_BY_NAME)
+            raise ValueError(
+                f"Unknown SOS endpoint {name!r}. "
+                f"Valid endpoints: {valid_names}"
+            ) from None
+
+
 # fmt: on
     @classmethod
     def sos_enabled_endpoints(cls) -> tuple[SOSEndpoint, ...]:

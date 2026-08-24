@@ -15,6 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.database import async_session
 from src.database.models.acenda_models import (
+    AcendaFulfillmentItems,
+    AcendaFulfillments,
+    AcendaFulfillmentTracking,
     AcendaOrderHeaders,
     AcendaOrderItems,
     AcendaOrderLineDiscounts,
@@ -25,9 +28,11 @@ from src.database.models.acenda_models import (
 )
 from src.database.models.data_lake_models import DataLakeFile
 
+from src.core.config import settings
+
 logger = logging.getLogger(__name__)
 
-PayloadType = Literal["order", "ship_advice"]
+RETRYABLE_LAKE_FILE_STATUSES = ("LANDED", "FAILED", "PARTIAL")
 
 
 @dataclass(frozen=True)
@@ -57,19 +62,38 @@ def as_int(value: Any) -> int:
     return 0 if value is None else int(value)
 
 
-def _acenda_payload_type_from_entity(entity_name: str) -> PayloadType:
-    if entity_name in {"new_orders", "updated_orders", "all_orders", "acenda_orders"}:
-        return "order"
+def require_positive_int(data: dict[str, Any], field_name: str) -> int:
+    value = data.get(field_name)
 
-    if entity_name in {
-        "new_ship_advices",
-        "updated_ship_advices",
-        "all_ship_advices",
-        "acenda_ship_advices",
-    }:
-        return "ship_advice"
+    if value is None or isinstance(value, bool):
+        raise ValueError(f"{field_name} must be a positive integer")
 
-    raise ValueError(f"Unsupported Acenda entity_name: {entity_name}")
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must be a positive integer") from exc
+
+    if parsed <= 0 or (isinstance(value, float) and not value.is_integer()):
+        raise ValueError(f"{field_name} must be a positive integer")
+
+    return parsed
+
+
+def require_datetime(data: dict[str, Any], field_name: str) -> datetime:
+    value = data.get(field_name)
+
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be a timezone-aware timestamp")
+
+    try:
+        parsed = parse_dt(value)
+    except ValueError as exc:
+        raise ValueError(f"{field_name} must be a timezone-aware timestamp") from exc
+
+    if parsed is None or parsed.tzinfo is None:
+        raise ValueError(f"{field_name} must be a timezone-aware timestamp")
+
+    return parsed
 
 
 ### End Helpers ###
@@ -79,12 +103,15 @@ def _acenda_payload_type_from_entity(entity_name: str) -> PayloadType:
 
 async def acenda_load_to_db() -> None:
     order_entities = ["new_orders", "updated_orders", "acenda_orders"]
+    return_entities = ["acenda_returns"]
 
     ship_advice_entities = [
         "new_ship_advices",
         "updated_ship_advices",
         "acenda_ship_advices",
     ]
+
+    fulfillment_entities = ["acenda_fulfillments"]
 
     total_results = []
 
@@ -95,7 +122,21 @@ async def acenda_load_to_db() -> None:
         )
         total_results.append((entity_name, result))
 
+    for entity_name in return_entities:
+        result = await load_acenda_lake_files(
+            entity_name=entity_name,
+            limit=50,
+        )
+        total_results.append((entity_name, result))
+
     for entity_name in ship_advice_entities:
+        result = await load_acenda_lake_files(
+            entity_name=entity_name,
+            limit=50,
+        )
+        total_results.append((entity_name, result))
+
+    for entity_name in fulfillment_entities:
         result = await load_acenda_lake_files(
             entity_name=entity_name,
             limit=50,
@@ -141,7 +182,7 @@ async def load_acenda_lake_files(
                 expected_entity_name=lake_file.entity_name,
             )
 
-            payload_type = _acenda_payload_type_from_entity(lake_file.entity_name)
+            payload_type = settings.acenda_payload_type(lake_file.entity_name)
 
             async with async_session() as session:
                 async with session.begin():
@@ -244,7 +285,7 @@ async def claim_lake_files(
         select(DataLakeFile)
         .where(
             or_(
-                DataLakeFile.status.in_(["LANDED", "FAILED"]),
+                DataLakeFile.status.in_(RETRYABLE_LAKE_FILE_STATUSES),
                 and_(
                     DataLakeFile.status == "PROCESSING",
                     DataLakeFile.claimed_at < stale_processing_before,
@@ -287,7 +328,7 @@ async def claim_lake_files(
 async def load_acenda_records(
     session: AsyncSession,
     records: list[dict[str, Any]],
-    payload_type: PayloadType,
+    payload_type: str,
 ) -> dict[str, Any]:
     mapper = AcendaPayloadMapper()
 
@@ -306,6 +347,14 @@ async def load_acenda_records(
             elif payload_type == "ship_advice":
                 data = mapper.map_ship_advice_header(data=raw_record)
                 model = AcendaShipAdviceHeaders
+
+            elif payload_type == "fulfillment":
+                data = mapper.map_acenda_fulfillment(data=raw_record)
+                model = AcendaFulfillments
+
+            elif payload_type == "return":
+                data = mapper.map_acenda_return(data=raw_record)
+                model = AcendaOrderReturns
 
             else:
                 raise ValueError(f"Unsupported Acenda payload type: {payload_type}")
@@ -375,6 +424,62 @@ def extract_json_records(
 
 class AcendaPayloadMapper:
 
+    def map_acenda_fulfillment(self, data: dict[str, Any]) -> AcendaFulfillments:
+        fulfillment = AcendaFulfillments(
+            id=as_int(data.get("id")),
+            created_at=parse_dt(data.get("created_at")),
+            updated_at=parse_dt(data.get("updated_at")),
+            fields=data.get("fields") or {},
+            ship_advice_id=as_int(data.get("ship_advice_id")),
+            carrier=data.get("carrier"),
+            date_shipped=parse_dt(data.get("date_shipped")),
+            shipping_method=data.get("shipping_method"),
+            status=data.get("status"),
+            fulfillment_type=data.get("type"),
+            cost=as_float(data.get("cost")),
+            is_ltl=bool(data.get("is_ltl", False)),
+        )
+
+        fulfillment.tracking = [
+            self.map_acenda_fulfillment_tracking(
+                tracking,
+                fulfillment_id=fulfillment.id,
+            )
+            for tracking in data.get("tracking_info") or []
+        ]
+        fulfillment.items = [
+            self.map_acenda_fulfillment_item(
+                item,
+                fulfillment_id=fulfillment.id,
+            )
+            for item in data.get("fulfillment_items") or []
+        ]
+
+        return fulfillment
+
+    def map_acenda_fulfillment_tracking(
+        self,
+        data: dict[str, Any],
+        *,
+        fulfillment_id: int,
+    ) -> AcendaFulfillmentTracking:
+        return AcendaFulfillmentTracking(
+            fulfillment_id=fulfillment_id,
+            tracking_number=as_str(data.get("number")),
+        )
+
+    def map_acenda_fulfillment_item(
+        self,
+        data: dict[str, Any],
+        *,
+        fulfillment_id: int,
+    ) -> AcendaFulfillmentItems:
+        return AcendaFulfillmentItems(
+            fulfillment_id=fulfillment_id,
+            ship_advice_item_id=as_int(data.get("ship_advice_item_id")),
+            quantity=as_int(data.get("quantity")),
+        )
+
     def map_acenda_order(self, data: dict[str, Any]) -> AcendaOrderHeaders:
         ship = data.get("shipping_information") or {}
         bill = data.get("billing_information") or {}
@@ -441,8 +546,6 @@ class AcendaPayloadMapper:
         order.items = [
             self.map_acenda_order_item(item) for item in data.get("order_item", [])
         ]
-
-        order.returns = [self.map_acenda_return(ret) for ret in data.get("returns", [])]
 
         return order
 
@@ -549,14 +652,14 @@ class AcendaPayloadMapper:
 
     def map_acenda_return(self, data: dict[str, Any]) -> AcendaOrderReturns:
         return AcendaOrderReturns(
-            id=as_int(data.get("id")),
+            id=require_positive_int(data, "id"),
             created_at=parse_dt(data.get("created_at")),
             created_by=as_str(data.get("created_by")),
-            updated_at=parse_dt(data.get("updated_at")),
+            updated_at=require_datetime(data, "updated_at"),
             updated_by=as_str(data.get("updated_by")),
             fields=data.get("fields") or {},
-            order_id=as_int(data.get("order_id")),
-            order_item_id=as_int(data.get("order_item_id")),
+            order_id=require_positive_int(data, "order_id"),
+            order_item_id=require_positive_int(data, "order_item_id"),
             quantity=as_int(data.get("quantity")),
             rma=as_str(data.get("rma")),
             license_plate_number=as_str(data.get("license_plate_number")),

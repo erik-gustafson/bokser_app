@@ -465,6 +465,27 @@ class AcendaShipAdviceHeaders(Base):
     delivery_info_email: Mapped[str | None] = mapped_column(Text, nullable=True)
     delivery_info_phone_number: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    fulfillments: Mapped[list["AcendaFulfillments"]] = relationship(
+        "AcendaFulfillments",
+        primaryjoin=(
+            "AcendaShipAdviceHeaders.id == "
+            "foreign(AcendaFulfillments.ship_advice_id)"
+        ),
+        foreign_keys="AcendaFulfillments.ship_advice_id",
+        back_populates="ship_advice",
+        viewonly=True,
+    )
+
+    fulfillment_tracking: Mapped[list["AcendaFulfillmentTracking"]] = relationship(
+        "AcendaFulfillmentTracking",
+        secondary=lambda: AcendaFulfillments.__table__,
+        primaryjoin=lambda: AcendaShipAdviceHeaders.id
+        == foreign(AcendaFulfillments.ship_advice_id),
+        secondaryjoin=lambda: AcendaFulfillments.id
+        == foreign(AcendaFulfillmentTracking.fulfillment_id),
+        viewonly=True,
+    )
+
 
 class AcendaShipAdviceItems(Base):
     __tablename__ = "ship_advice_items"
@@ -498,3 +519,119 @@ class AcendaShipAdviceItems(Base):
 
     inventory_detail_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     quantity_rerouted: Mapped[int] = mapped_column(default=0)
+
+    fulfillment_items: Mapped[list["AcendaFulfillmentItems"]] = relationship(
+        "AcendaFulfillmentItems",
+        primaryjoin=(
+            "AcendaShipAdviceItems.id == "
+            "foreign(AcendaFulfillmentItems.ship_advice_item_id)"
+        ),
+        foreign_keys="AcendaFulfillmentItems.ship_advice_item_id",
+        back_populates="ship_advice_item",
+        viewonly=True,
+    )
+
+
+class AcendaFulfillments(Base):
+    __tablename__ = "fulfillments"
+    __table_args__ = {"schema": ACENDA_SCHEMA}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+    fields: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON,
+        default=dict,
+        nullable=True,
+    )
+
+    ship_advice_id: Mapped[int] = mapped_column(
+        Integer,
+        index=True,
+        nullable=False,
+    )
+
+    ship_advice: Mapped["AcendaShipAdviceHeaders"] = relationship(
+        "AcendaShipAdviceHeaders",
+        primaryjoin=(
+            "foreign(AcendaFulfillments.ship_advice_id) == "
+            "AcendaShipAdviceHeaders.id"
+        ),
+        foreign_keys=[ship_advice_id],
+        back_populates="fulfillments",
+        viewonly=True,
+    )
+
+    carrier: Mapped[str | None] = mapped_column(Text, nullable=True)
+    date_shipped: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    shipping_method: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fulfillment_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cost: Mapped[float] = mapped_column(default=0.0)
+    is_ltl: Mapped[bool] = mapped_column(default=False)
+
+    items: Mapped[list["AcendaFulfillmentItems"]] = relationship(
+        back_populates="fulfillment",
+        cascade="all, delete-orphan",
+    )
+
+    tracking: Mapped[list["AcendaFulfillmentTracking"]] = relationship(
+        back_populates="fulfillment",
+        cascade="all, delete-orphan",
+    )
+
+
+class AcendaFulfillmentTracking(Base):
+    __tablename__ = "fulfillment_tracking"
+    __table_args__ = {"schema": ACENDA_SCHEMA}
+
+    tracking_number: Mapped[str] = mapped_column(Text, primary_key=True)
+
+    fulfillment_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{ACENDA_SCHEMA}.fulfillments.id"),
+        index=True,
+        nullable=False,
+        primary_key=True,
+    )
+
+    fulfillment: Mapped["AcendaFulfillments"] = relationship(
+        back_populates="tracking",
+    )
+
+
+class AcendaFulfillmentItems(Base):
+    __tablename__ = "fulfillment_items"
+    __table_args__ = {"schema": ACENDA_SCHEMA}
+
+    fulfillment_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{ACENDA_SCHEMA}.fulfillments.id"),
+        index=True,
+        nullable=False,
+        primary_key=True,
+    )
+
+    ship_advice_item_id: Mapped[int] = mapped_column(
+        Integer,
+        index=True,
+        nullable=False,
+        primary_key=True,
+    )
+
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    ship_advice_item: Mapped["AcendaShipAdviceItems"] = relationship(
+        "AcendaShipAdviceItems",
+        primaryjoin=(
+            "foreign(AcendaFulfillmentItems.ship_advice_item_id) == "
+            "AcendaShipAdviceItems.id"
+        ),
+        foreign_keys=[ship_advice_item_id],
+        back_populates="fulfillment_items",
+        viewonly=True,
+    )
+
+    fulfillment: Mapped["AcendaFulfillments"] = relationship(
+        back_populates="items",
+    )
