@@ -65,7 +65,7 @@ class AcendaSettings(AppBaseSettings):
     @classmethod
     def acenda_endpoints_as_dict(cls, name: str) -> AcendaEndpoint:
         try:
-            return cls.ENDPOINT_BY_NAME[name]
+            return cls.ACENDA_ENDPOINT_BY_NAME[name]
         except KeyError:
             raise ValueError(f"Invalid Acenda endpoint {name}") from None
 

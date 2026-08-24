@@ -26,12 +26,12 @@ PayloadType = Literal[
     "item_receipt",
     "item",
     "purchase_order",
-    "sales_receipts",
-    "estimates",
-    "adjustments",
-    "returns",
-    "rmas",
-    "payments",
+    "sales_receipt",
+    "estimate",
+    "adjustment",
+    "return",
+    "rma",
+    "payment",
 ]
 
 SosRootRecord: TypeAlias = (
@@ -57,12 +57,12 @@ SOS_ENTITY_TYPES: dict[str, PayloadType] = {
     "updated_items": "item",
     "updated_purchase_orders": "purchase_order",
     "purchase_orders": "purchase_order",
-    "sales_receipts": "sales_receipts",
-    "estimates": "estimates",
-    "adjustments": "adjustments",
-    "returns": "returns",
-    "rmas": "rmas",
-    "payments": "payments",
+    "sales_receipts": "sales_receipt",
+    "estimates": "estimate",
+    "adjustments": "adjustment",
+    "returns": "return",
+    "rmas": "rma",
+    "payments": "payment",
 }
 
 PAYLOAD_MODELS: dict[PayloadType, type[SosRootRecord]] = {
@@ -72,12 +72,12 @@ PAYLOAD_MODELS: dict[PayloadType, type[SosRootRecord]] = {
     "item_receipt": SosItemReceiptHeader,
     "item": SosItem,
     "purchase_order": SosPurchaseOrderHeader,
-    "sales_receipts": SosSalesReceiptHeader,
-    "estimates": SosEstimateHeader,
-    "adjustments": SosAdjustmentHeader,
-    "returns": SosReturnHeader,
-    "rmas": SosRmaHeader,
-    "payments": SosPaymentHeader,
+    "sales_receipt": SosSalesReceiptHeader,
+    "estimate": SosEstimateHeader,
+    "adjustment": SosAdjustmentHeader,
+    "return": SosReturnHeader,
+    "rma": SosRmaHeader,
+    "payment": SosPaymentHeader,
 }
 
 
@@ -480,17 +480,17 @@ class SosPayloadMapper:
             return self.map_item(data)
         if payload_type == "purchase_order":
             return self.map_purchase_order(data)
-        if payload_type == "sales_receipts":
+        if payload_type == "sales_receipt":
             return self.map_sales_receipt(data)
-        if payload_type == "estimates":
+        if payload_type == "estimate":
             return self.map_estimate(data)
-        if payload_type == "adjustments":
+        if payload_type == "adjustment":
             return self.map_adjustment(data)
-        if payload_type == "returns":
+        if payload_type == "return":
             return self.map_return(data)
-        if payload_type == "rmas":
+        if payload_type == "rma":
             return self.map_rma(data)
-        if payload_type == "payments":
+        if payload_type == "payment":
             return self.map_payment(data)
         raise ValueError(f"Unsupported SOS payload type: {payload_type}")
 
