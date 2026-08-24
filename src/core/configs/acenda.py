@@ -6,8 +6,6 @@ from dataclasses import dataclass, field
 from typing import Any, ClassVar, Tuple
 from pathlib import Path
 from .base import AppBaseSettings
-from src.database.database import Base
-from src.database.models import AcendaOrderHeaders
 from src.storage.states.state_store import acenda_state
 
 

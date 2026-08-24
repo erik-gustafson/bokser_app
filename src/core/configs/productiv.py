@@ -6,8 +6,6 @@ from dataclasses import dataclass, field
 from typing import Any, ClassVar, Tuple, Optional
 from pathlib import Path
 
-from src.database.database import async_session
-from src.database.models import DataLakeCursors
 
 from .base import AppBaseSettings
 
@@ -79,33 +77,33 @@ class ProductivSettings(AppBaseSettings):
 
         return {}
 
-    @classmethod
-    ### Pull from Datalake DB Table
-    def get_productiv_cursor(cls, file_path: Path, endpoint: ProductivEndpoint) -> str:
+    # @classmethod
+    # ### Pull from Datalake DB Table
+    # def get_productiv_cursor(cls, file_path: Path, endpoint: ProductivEndpoint) -> str:
 
-        one_day_back = cls.acenda_timestamp_format(
-            datetime.now(timezone.utc) - timedelta(days=1)
-        )
+    #     one_day_back = cls.acenda_timestamp_format(
+    #         datetime.now(timezone.utc) - timedelta(days=1)
+    #     )
 
-        # try:
-        #     if not endpoint.state_data:
-        #         raise Exception
+    # try:
+    #     if not endpoint.state_data:
+    #         raise Exception
 
-        #     state_dict_dt = acenda_state._state[endpoint.state_data[0]][endpoint.state_data[1]]
+    #     state_dict_dt = acenda_state._state[endpoint.state_data[0]][endpoint.state_data[1]]
 
-        #     if isinstance(state_dict_dt, str) and state_dict_dt.strip():
-        #         return state_dict_dt
+    #     if isinstance(state_dict_dt, str) and state_dict_dt.strip():
+    #         return state_dict_dt
 
-        #     with open(file_path, "r", encoding="utf-8") as f:
-        #         data: dict = json.load(f)
-        #     watermark = data[endpoint.state_data[0]][endpoint.state_data[1]]
-        #     if isinstance(watermark, str) and watermark.strip():
-        #         return watermark
+    #     with open(file_path, "r", encoding="utf-8") as f:
+    #         data: dict = json.load(f)
+    #     watermark = data[endpoint.state_data[0]][endpoint.state_data[1]]
+    #     if isinstance(watermark, str) and watermark.strip():
+    #         return watermark
 
-        #     return one_day_back
+    #     return one_day_back
 
-        # except:
-        #     return one_day_back
+    # except:
+    #     return one_day_back
 
     @classmethod
     def acenda_timestamp_format(cls, dt: date | datetime | None) -> str:
