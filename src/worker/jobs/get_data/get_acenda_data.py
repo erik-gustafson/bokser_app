@@ -208,10 +208,22 @@ class GetAcendaData:
         *,
         context: str,
     ) -> list[dict[str, Any]]:
-        records = payload.get("result", [])
+        errors = payload.get("errors")
+        records = payload.get("result")
+        num_results = payload.get("num_results")
+
+        if errors:
+            raise ValueError(f"Acenda returned errors ({context}): {errors}")
+
+        if records is None and num_results == 0:
+            return []
 
         if not isinstance(records, list):
-            raise ValueError(f"Expected Acenda result list ({context})")
+            raise ValueError(
+                f"Expected Acenda result list ({context}); "
+                f"received result type={type(records).__name__}, "
+                f"num_results={num_results!r}"
+            )
 
         return records
 
