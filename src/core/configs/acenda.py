@@ -43,7 +43,7 @@ class AcendaSettings(AppBaseSettings):
         AcendaEndpoint(name="acenda_catalog", path="/catalog", params={"query":{"updated_at":{"$gt":None}}}, state_data=("acenda_catalog", "last_updated_at"), payload_type="catalog"),
     )
 
-    ENDPOINT_BY_NAME: ClassVar[dict[str, AcendaEndpoint]] = {
+    ACENDA_ENDPOINT_BY_NAME: ClassVar[dict[str, AcendaEndpoint]] = {
         endpoint.name: endpoint
         for endpoint in ACENDA_ENDPOINTS
     }

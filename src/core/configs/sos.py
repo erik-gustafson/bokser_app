@@ -18,6 +18,7 @@ TIMEZONE_DICT = {"cst": ZoneInfo("America/Chicago"), "utc": ZoneInfo("UTC")}
 class SOSEndpoint:
     name: str
     path: str
+    payload_type: str
     params: dict[str, Any] = field(default_factory=dict)
     state_data: tuple[str, ...] | None = None
     enabled: bool = True
@@ -68,85 +69,74 @@ class SosSettings(AppBaseSettings):
             name="updated_sales_orders",
             path="/salesorder/",
             state_data=("sales_orders", "updated"),
+            payload_type="sales_order"
         ),
         SOSEndpoint(
             name="sales_receipts",
             path="/salesreceipt/",
             state_data=("sales_receipts", "updated"),
+            payload_type="sales_receipt"
         ),
         SOSEndpoint(
             name="estimates",
             path="/estimate/",
             state_data=("estimates", "updated"),
+            payload_type="estimate"
         ),
         SOSEndpoint(
             name="updated_invoices",
             path="/invoice/",
-            state_data=("invoices", "updated")
+            state_data=("invoices", "updated"),
+            payload_type="invoice"
         ),
         SOSEndpoint(
             name="updated_shipments",
             path="/shipment/",
-            state_data=("shipments", "updated")
+            state_data=("shipments", "updated"),
+            payload_type="shipment"
         ),
         SOSEndpoint(
             name="updated_item_receipts",
             path="/itemreceipt/",
             state_data=("item_receipts", "updated"),
+            payload_type="item_receipt"
         ),
         SOSEndpoint(
             name="updated_items",
             path="/item/",
-            state_data=("items", "updated")),
+            state_data=("items", "updated"),
+            payload_type="item",
+        ),
         SOSEndpoint(
             name="payments",
             path="/payment/",
-            state_data=("payments", "all")
+            state_data=("payments", "all"),
+            payload_type="payment"
         ),
         SOSEndpoint(
             name="purchase_orders",
             path="/purchaseorder/",
             state_data=("purchase_orders", "updated"),
+            payload_type="purchase_order"
         ),
         SOSEndpoint(
             name="adjustments",
             path="/adjustment/",
             state_data=("adjustments", "updated"),
+            payload_type="adjustment"
         ),
         SOSEndpoint(
             name="returns",
             path="/return/",
             state_data=("returns", "updated"),
+            payload_type="return"
         ),
         SOSEndpoint(
             name="rmas",
             path="/rma/",
             state_data=("rmas", "updated"),
+            payload_type="rma"
         ),
-        # SOSEndpoint(
-        #     name="new_items",
-        #     path="/item/",
-        #     state_data=("items", "new")),
-        # SOSEndpoint(
-        #     name="new_item_receipts",
-        #     path="/itemreceipt/",
-        #     state_data=("item_receipts", "new"),
-        # ),
-        # SOSEndpoint(
-        #     name="new_shipments",
-        #     path="/shipment/",
-        #     state_data=("shipments", "new")
-        # ),
-        # SOSEndpoint(
-        #     name="new_invoices",
-        #     path="/invoice/",
-        #     state_data=("invoices", "new")
-        # ),
-        # SOSEndpoint(
-        #     name="new_sales_orders",
-        #     path="/salesorder/",
-        #     state_data=("sales_orders", "new"),
-        # ),
     )
 
     SOS_RECORD_TYPES: ClassVar[dict[str, Any]] = {
@@ -154,7 +144,7 @@ class SosSettings(AppBaseSettings):
         "created": "last_run_at",
     }
 
-    ENDPOINT_BY_NAME: ClassVar[dict[str, SOSEndpoint]] = {
+    SOS_ENDPOINT_BY_NAME: ClassVar[dict[str, SOSEndpoint]] = {
         endpoint.name: endpoint
         for endpoint in SOS_ENDPOINTS
     }
@@ -162,9 +152,9 @@ class SosSettings(AppBaseSettings):
     @classmethod
     def get_endpoint(cls, name: str) -> SOSEndpoint:
         try:
-            return cls.ENDPOINT_BY_NAME[name]
+            return cls.SOS_ENDPOINT_BY_NAME[name]
         except KeyError:
-            valid_names = ", ".join(cls.ENDPOINT_BY_NAME)
+            valid_names = ", ".join(cls.SOS_ENDPOINT_BY_NAME)
             raise ValueError(
                 f"Unknown SOS endpoint {name!r}. "
                 f"Valid endpoints: {valid_names}"
@@ -183,6 +173,23 @@ class SosSettings(AppBaseSettings):
     @classmethod
     def sos_endpoint_names(cls) -> list[str]:
         return [endpoint.name for endpoint in cls.sos_enabled_endpoints()]
+
+
+    @classmethod
+    def sos_endpoints_as_dict(cls, name: str) -> SOSEndpoint:
+        try:
+            return cls.SOS_ENDPOINT_BY_NAME[name]
+        except KeyError:
+            raise ValueError(f"Invalid SOS endpoint {name}") from None
+
+    @classmethod
+    def sos_payload_type(cls, name: str):
+        try:
+            endpoint_dict = cls.sos_endpoints_as_dict(name)
+            return endpoint_dict.payload_type
+        except:
+            raise ValueError(f"Payload Type not set for {name}")
+        
 
     @classmethod
     def get_sos_endpoint_params(
