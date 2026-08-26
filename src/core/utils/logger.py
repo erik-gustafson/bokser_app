@@ -1,63 +1,25 @@
-import os
 import logging
-import tempfile
-from logging.handlers import TimedRotatingFileHandler
+import sys
 
-DEFAULT_LOG_DIR = os.getenv("LOGS_ROOT") or os.getenv("LOG_DIR", "/app/logs")
-FALLBACK_LOG_DIR = os.path.join(tempfile.gettempdir(), "bokser_app_logs")
+LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
 
-def _build_file_handler(filepath: str) -> TimedRotatingFileHandler:
-    handler = TimedRotatingFileHandler(
-        filepath, when="midnight", backupCount=14, encoding="utf-8"
-    )
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    handler.setFormatter(formatter)
-    return handler
+def _resolve_log_level(log_level: str) -> int:
+    level = getattr(logging, str(log_level).upper(), logging.INFO)
+    return level if isinstance(level, int) else logging.INFO
 
 
-def get_file_handler(filename: str):
-    log_directories = [DEFAULT_LOG_DIR, FALLBACK_LOG_DIR]
-    last_error: OSError | None = None
+def setup_logging(log_level: str = "INFO") -> logging.Logger:
+    """Configure application logging for container stdout collection."""
+    root_logger = logging.getLogger()
+    root_logger.setLevel(_resolve_log_level(log_level))
 
-    for log_directory in log_directories:
-        try:
-            os.makedirs(log_directory, exist_ok=True)
-            filepath = os.path.join(log_directory, filename)
-            return _build_file_handler(filepath)
-        except OSError as exc:
-            last_error = exc
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+        handler.close()
 
-    if last_error is not None:
-        raise last_error
-    raise RuntimeError("No writable log directory available")
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+    root_logger.addHandler(console_handler)
 
-
-def setup_logging(log_file: str):
-    """
-    log_file -> "api.log" OR "worker.log" OR "migrate.log"
-    """
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-
-    # Remove any default handlers so logs don't double-print
-    for h in logger.handlers[:]:
-        logger.removeHandler(h)
-
-    # Add console handler for docker logs
-    console = logging.StreamHandler()
-    console.setFormatter(
-        logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    )
-    logger.addHandler(console)
-
-    # Prefer file logging, but keep the process alive if the mounted log
-    # directory is not writable in the runtime environment.
-    try:
-        logger.addHandler(get_file_handler(log_file))
-    except OSError as exc:
-        logger.warning("File logging disabled for %s: %s", log_file, exc)
-
-    return logger
+    return root_logger

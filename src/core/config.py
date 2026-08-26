@@ -26,7 +26,6 @@ class Settings(
     log_level: str = "INFO"
 
     lake_root: Path = Path("/data_lake")
-    logs_root: Path = Path("/app/logs")
     downloads_root: Path = Path("/app/downloads")
     reporting_archive_root: Path = Path("/app/reporting_archive")
 

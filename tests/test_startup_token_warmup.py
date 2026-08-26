@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 import direct_runner
-from src.api import old_main as api_main
+from src.api import main as api_main
 from src.worker import main as worker_main
 
 
@@ -55,7 +55,7 @@ class StartupWarmupTests(unittest.IsolatedAsyncioTestCase):
         scheduler = _FakeScheduler()
 
         original_token_store = worker_main.token_store
-        original_configure_logging = worker_main.configure_logging
+        original_setup_logging = worker_main.setup_logging
         original_event = worker_main.asyncio.Event
         original_loop_getter = worker_main.asyncio.get_running_loop
         original_build_http_client = worker_main.build_http_client
@@ -64,19 +64,19 @@ class StartupWarmupTests(unittest.IsolatedAsyncioTestCase):
         original_register_jobs = worker_main.register_jobs
 
         worker_main.token_store = warmup  # type: ignore[assignment]
-        worker_main.configure_logging = lambda: None  # type: ignore[assignment]
+        worker_main.setup_logging = lambda *_: None  # type: ignore[assignment]
         worker_main.asyncio.Event = lambda: _FakeStopEvent()  # type: ignore[assignment]
         worker_main.asyncio.get_running_loop = lambda: _FakeLoop()  # type: ignore[assignment]
         worker_main.build_http_client = lambda: _FakeHttpClientContext()  # type: ignore[assignment]
         worker_main.build_runtime = lambda http_client: object()  # type: ignore[assignment]
         worker_main.build_scheduler = lambda: scheduler  # type: ignore[assignment]
-        worker_main.register_jobs = lambda scheduler, runtime: None  # type: ignore[assignment]
+        worker_main.register_jobs = lambda scheduler, runtime, logger: None  # type: ignore[assignment]
 
         try:
             await worker_main.run_worker()
         finally:
             worker_main.token_store = original_token_store  # type: ignore[assignment]
-            worker_main.configure_logging = original_configure_logging  # type: ignore[assignment]
+            worker_main.setup_logging = original_setup_logging  # type: ignore[assignment]
             worker_main.asyncio.Event = original_event  # type: ignore[assignment]
             worker_main.asyncio.get_running_loop = original_loop_getter  # type: ignore[assignment]
             worker_main.build_http_client = original_build_http_client  # type: ignore[assignment]

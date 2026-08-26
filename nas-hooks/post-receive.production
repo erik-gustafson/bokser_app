@@ -6,6 +6,7 @@ APP_DIR="/volume1/docker/bokser_app"
 LOG="/var/log/git-deploy-prod.log"
 BRANCH_EXPECTED="main"
 BASE_COMPOSE="docker/docker-compose.yml"
+SYNOLOGY_COMPOSE="docker/docker-compose.synology.yml"
 ENV_FILE="docker/.env"
 HEALTH_URL="http://127.0.0.1:8010/health/status"
 HEALTH_RETRIES=30
@@ -32,6 +33,14 @@ run_compose() {
     "$COMPOSE_BIN" "$@"
   else
     "$DOCKER_BIN" compose "$@"
+  fi
+}
+
+run_prod_compose() {
+  if [ -f "$SYNOLOGY_COMPOSE" ]; then
+    run_compose --env-file "$ENV_FILE" -f "$BASE_COMPOSE" -f "$SYNOLOGY_COMPOSE" "$@"
+  else
+    run_compose --env-file "$ENV_FILE" -f "$BASE_COMPOSE" "$@"
   fi
 }
 
@@ -68,7 +77,6 @@ done
   echo "ERROR: Missing compose file in $APP_DIR" | tee -a "$LOG"
   exit 1
 }
-
 checkout_rev() {
   local rev="$1"
   echo "Checking out '$rev' to $APP_DIR" | tee -a "$LOG"
@@ -92,16 +100,16 @@ health_check() {
 deploy_current() {
   cd "$APP_DIR"
   echo "Prod: down..." | tee -a "$LOG"
-  run_compose --env-file "$ENV_FILE" -f "$BASE_COMPOSE" down 2>&1 | tee -a "$LOG" || true
+  run_prod_compose down 2>&1 | tee -a "$LOG" || true
   echo "Prod: build..." | tee -a "$LOG"
-  run_compose --env-file "$ENV_FILE" -f "$BASE_COMPOSE" build 2>&1 | tee -a "$LOG"
+  run_prod_compose build 2>&1 | tee -a "$LOG"
   echo "Prod: up..." | tee -a "$LOG"
-  run_compose --env-file "$ENV_FILE" -f "$BASE_COMPOSE" up -d 2>&1 | tee -a "$LOG"
+  run_prod_compose up -d 2>&1 | tee -a "$LOG"
 }
 
 log_diagnostics() {
-  run_compose --env-file "$ENV_FILE" -f "$BASE_COMPOSE" ps 2>&1 | tee -a "$LOG" || true
-  run_compose --env-file "$ENV_FILE" -f "$BASE_COMPOSE" logs --tail 200 "${LOG_SERVICES[@]}" 2>&1 | tee -a "$LOG" || true
+  run_prod_compose ps 2>&1 | tee -a "$LOG" || true
+  run_prod_compose logs --tail 200 "${LOG_SERVICES[@]}" 2>&1 | tee -a "$LOG" || true
 }
 
 rollback_to_old() {
@@ -117,6 +125,11 @@ rollback_to_old() {
 }
 
 checkout_rev "$NEWREV"
+[ -f "$APP_DIR/$SYNOLOGY_COMPOSE" ] || {
+  echo "New revision is missing $SYNOLOGY_COMPOSE; rolling back." | tee -a "$LOG"
+  rollback_to_old
+  exit 1
+}
 deploy_current
 if health_check; then
   echo "Prod deploy healthy for $NEWREV @ $(date)" | tee -a "$LOG"

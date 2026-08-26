@@ -15,7 +15,6 @@ services:
       - .env
     volumes:
       - ${LAKE_HOST_PATH}:${LAKE_ROOT}:rw
-      - ${LOGS_HOST_PATH}:${LOGS_ROOT}:rw
 
   bokser_app_api:
     build:
@@ -33,7 +32,6 @@ services:
       - .env
     volumes:
       - ${LAKE_HOST_PATH}:${LAKE_ROOT}:rw
-      - ${LOGS_HOST_PATH}:${LOGS_ROOT}:rw
       - ${DOWNLOADS_HOST_PATH}:${DOWNLOADS_ROOT}:rw
       - ${REPORTING_ARCHIVE_HOST_PATH}:${REPORTING_ARCHIVE_ROOT}:rw
 
@@ -52,7 +50,6 @@ services:
       - .env
     volumes:
       - ${LAKE_HOST_PATH}:${LAKE_ROOT}:rw
-      - ${LOGS_HOST_PATH}:${LOGS_ROOT}:rw
       - ${DOWNLOADS_HOST_PATH}:${DOWNLOADS_ROOT}:rw
       - ${REPORTING_ARCHIVE_HOST_PATH}:${REPORTING_ARCHIVE_ROOT}:rw
 

@@ -31,13 +31,6 @@ class WorkerRuntime:
     raw_writer: RawPayloadWriter
 
 
-def configure_logging() -> None:
-    logging.basicConfig(
-        level=getattr(logging, settings.log_level.upper(), logging.INFO),
-        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-    )
-
-
 def build_http_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(timeout=30.0)
 
@@ -130,7 +123,7 @@ def build_scheduler() -> AsyncIOScheduler:
 
 async def run_worker() -> None:
 
-    setup_logging("worker.log")
+    setup_logging(settings.log_level)
     logger = logging.getLogger("worker")
 
     await token_store.warmup_on_startup()

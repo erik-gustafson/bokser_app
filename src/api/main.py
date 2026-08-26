@@ -12,7 +12,7 @@ from src.core.config import settings
 from src.api.services.validators import WMSKeyVerifier
 from src.integrations._base_client.token_cache import token_store
 
-setup_logging("api.log")  # <--- writes to /app/logs/api.log
+setup_logging(settings.log_level)
 logger = logging.getLogger("api")
 
 logger.info("Starting API app...")
@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
     verifier = WMSKeyVerifier()
     await verifier.warm()  # fetch and cache key at boot
     app.state.wms_verifier = verifier
-    logger.info("✅ WMS RSA verifier initialized and key cached")
+    logger.info("WMS RSA verifier initialized and key cached")
 
     await token_store.warmup_on_startup()
 
@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
 
     # Shutdown tasks
     await app.state.wms_verifier.aclose()
-    logger.info("🛑 WMS RSA verifier closed")
+    logger.info("WMS RSA verifier closed")
 
 
 # ---- FASTAPI APP ---- #

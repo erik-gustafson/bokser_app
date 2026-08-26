@@ -1,0 +1,24 @@
+services:
+  migrate:
+    logging:
+      driver: syslog
+      options:
+        syslog-address: ${SYSLOG_ADDRESS:-tcp://127.0.0.1:514}
+        syslog-format: rfc5424
+        tag: "{{.Name}}"
+
+  bokser_app_api:
+    logging:
+      driver: syslog
+      options:
+        syslog-address: ${SYSLOG_ADDRESS:-tcp://127.0.0.1:514}
+        syslog-format: rfc5424
+        tag: "{{.Name}}"
+
+  bokser_app_worker:
+    logging:
+      driver: syslog
+      options:
+        syslog-address: ${SYSLOG_ADDRESS:-tcp://127.0.0.1:514}
+        syslog-format: rfc5424
+        tag: "{{.Name}}"

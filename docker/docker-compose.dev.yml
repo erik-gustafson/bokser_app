@@ -2,16 +2,31 @@ name: bokser_app_dev
 
 services:
   migrate:
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "5"
     volumes:
       - ../:/app:rw
 
   bokser_app_api:
     command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "5"
     volumes:
       - ../:/app:rw
 
   bokser_app_worker:
     command: python -m debugpy --listen 0.0.0.0:5679 --wait-for-client -m src.worker.worker
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "5"
     ports:
       - 5679:5679
     volumes:
