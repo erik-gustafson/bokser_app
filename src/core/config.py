@@ -8,7 +8,12 @@ from .configs import *
 
 
 class Settings(
-    DatabaseSettings, HttpxSettings, SosSettings, ProductivSettings, AcendaSettings
+    DatabaseSettings,
+    HttpxSettings,
+    SosSettings,
+    ProductivSettings,
+    AcendaSettings,
+    BokserAPISettings,
 ):
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),

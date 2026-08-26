@@ -67,13 +67,13 @@ class ProductivSettings(AppBaseSettings):
         # watermark = (cls.get_productiv_cursor(file_path=file_path, endpoint=endpoint))
         ### Use DB table
 
-        if endpoint.data_type == "new":
+        # if endpoint.data_type == "new":
 
-            return {"query": json.dumps({"created_at": {"$gt": watermark}})}
+        #     return {"query": json.dumps({"created_at": {"$gt": watermark}})}
 
-        if endpoint.data_type == "update":
+        # if endpoint.data_type == "update":
 
-            return {"query": json.dumps({"updated_at": {"$gt": watermark}})}
+        #     return {"query": json.dumps({"updated_at": {"$gt": watermark}})}
 
         return {}
 

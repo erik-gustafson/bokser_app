@@ -118,8 +118,7 @@ class AcendaOrderPush:
                 )
 
         tasks = [
-            self._post_to_sos_and_log(mapped_order=order)
-            for order in mapped_orders
+            self._post_to_sos_and_log(mapped_order=order) for order in mapped_orders
         ]
 
         results = await asyncio.gather(*tasks)

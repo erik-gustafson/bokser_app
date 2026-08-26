@@ -248,11 +248,3 @@ class GetAcendaData:
             dt_value = self.get_max_date_value(records=records, type="updated_at")
             if dt_value is not None:
                 await acenda_state.update({state_type: {"last_updated_at": dt_value}})
-        # if state_type in ["new_orders", "new_ship_advices"]:
-        #     dt_value = self.get_max_date_value(records=records, type="created_at")
-        #     if dt_value is not None:
-        #         await acenda_state.update({state_type: {"last_created_at": dt_value}})
-        # if state_type in ["updated_orders", "updated_ship_advices"]:
-        #     dt_value = self.get_max_date_value(records=records, type="updated_at")
-        #     if dt_value is not None:
-        #         await acenda_state.update({state_type: {"last_updated_at": dt_value}})

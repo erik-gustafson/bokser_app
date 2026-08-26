@@ -1,11 +1,13 @@
 alembic
 apscheduler
 asyncpg
+cryptography>=43
 debugpy
 fastapi
 httpx
 psycopg[binary]
 pydantic
 pydantic-settings
+python-dateutil
 sqlalchemy
 uvicorn[standard]

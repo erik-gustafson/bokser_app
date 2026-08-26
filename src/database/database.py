@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import AsyncIterator, Iterator
-
+from typing import AsyncIterator, Iterator, Any, Callable, Optional
+from dataclasses import dataclass
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -14,6 +14,8 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from src.core.config import settings
 from src.database.base import Base
+
+TransformFunc = Callable[[Any], Any]
 
 
 def get_async_database_url(database_url: str) -> str:
@@ -105,6 +107,17 @@ async_session = async_sessionmaker(
 async def get_async_db() -> AsyncIterator[AsyncSession]:
     async with async_session() as session:
         yield session
+
+
+@dataclass
+class FieldMap:
+    """
+    Map a dotted payload path to a model attribute, with optional transform.
+    """
+
+    source: str  # payload path, e.g., "order.id"
+    target: str  # model attribute, e.g., "external_id"
+    transform: Optional[TransformFunc] = None
 
 
 __all__ = [

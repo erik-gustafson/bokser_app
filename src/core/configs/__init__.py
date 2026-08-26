@@ -6,6 +6,7 @@ from .httpx import HttpxSettings
 from .sos import SosSettings
 from .productiv import ProductivSettings
 from .acenda import AcendaSettings
+from .bokser_api import BokserAPISettings
 
 __all__ = [
     "AppBaseSettings",
@@ -16,4 +17,5 @@ __all__ = [
     "SosSettings",
     "ProductivSettings",
     "AcendaSettings",
+    "BokserAPISettings",
 ]

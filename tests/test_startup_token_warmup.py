@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 import direct_runner
-from src.api import main as api_main
+from src.api import old_main as api_main
 from src.worker import main as worker_main
 
 
