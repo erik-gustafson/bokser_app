@@ -12,6 +12,8 @@ from src.core.config import settings
 from src.api.services.validators import WMSKeyVerifier
 from src.integrations._base_client.token_cache import token_store
 
+from src.storage.raw.writer import RawPayloadWriter
+
 setup_logging(settings.log_level)
 logger = logging.getLogger("api")
 
@@ -28,6 +30,8 @@ async def lifespan(app: FastAPI):
     logger.info("WMS RSA verifier initialized and key cached")
 
     await token_store.warmup_on_startup()
+
+    app.state.raw_writer = RawPayloadWriter(settings.lake_root)
 
     # Let FastAPI run
     yield

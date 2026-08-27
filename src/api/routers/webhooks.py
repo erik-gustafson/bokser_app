@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.database import get_async_db
 from src.api.services.validators import verify_im_signature, WMSKeyVerifier
-from src.api.services.forwarders import UpdateExtensivOrder
-from src.database.models import BokserAPIWebhookEvent
+from src.storage.raw.writer import RawPayloadWriter
+from src.database.models import BokserAPIWebhookEvent, DataLakeFile
 from src.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -49,9 +49,9 @@ async def im_webhook_new(
         logger.exception("Signature verify error: %s", exc)
 
     try:
-        payload = await request.json()
+        records = await request.json()
     except Exception:
-        payload = {}
+        records = {}
 
     event_type_str = str(x_webhook_event or "unknown").strip() or "unknown"
 
@@ -61,7 +61,7 @@ async def im_webhook_new(
             source="ksp",
             event_type=event_type_str,
             signature_valid=bool(signature_valid),
-            payload=payload or {},
+            payload=records or {},
         )
     )
 
@@ -74,6 +74,17 @@ async def im_webhook_new(
         raise HTTPException(
             status_code=500,
             detail="Unable to determine webhook source",
+        )
+
+    raw_writer = request.app.state.raw_writer
+
+    if records:
+        await write_payload_to_data_lake(
+            session=db,
+            raw_writer=raw_writer,
+            records=records,
+            source_name="ksp",
+            endpoint_name="im_webhooks",
         )
 
     return {"ok": True}
@@ -103,7 +114,7 @@ async def productiv_webhook(
     raw_body = await request.body()
 
     try:
-        payload = json.loads(raw_body.decode("utf-8") or "{}")
+        payload: dict[str, Any] = json.loads(raw_body.decode("utf-8") or "{}")
 
     except json.JSONDecodeError:
         db.add(
@@ -150,7 +161,16 @@ async def productiv_webhook(
     if not external_id:
         raise HTTPException(status_code=400, detail="Missing externalId in payload")
 
-    await db.commit()
+    raw_writer = request.app.state.raw_writer
+
+    if payload:
+        await write_payload_to_data_lake(
+            session=db,
+            raw_writer=raw_writer,
+            records=payload,
+            source_name="productiv",
+            endpoint_name="productiv_webhooks",
+        )
 
     return {"ok": True}
 
@@ -269,3 +289,42 @@ def _verify_ups_track_alert_bearer(authorization: str | None) -> bool:
     if not candidate_token:
         return False
     return secrets.compare_digest(candidate_token, expected_token)
+
+
+async def write_payload_to_data_lake(
+    session: AsyncSession,
+    raw_writer: RawPayloadWriter,
+    records: dict[str, Any],
+    source_name: str,
+    endpoint_name: str,
+):
+
+    if records:
+        write_result = raw_writer.write_json_payload(
+            source_system=source_name,
+            entity_name=endpoint_name,
+            payload=records,
+        )
+
+        session.add(
+            DataLakeFile(
+                source_name=source_name,
+                entity_name=endpoint_name,
+                file_path=str(write_result.file_path),
+                file_name=write_result.file_name,
+                record_count=write_result.record_count,
+                file_size_bytes=write_result.file_size_bytes,
+                sha256=write_result.sha256,
+                landed_at=write_result.written_at_utc,
+                status="LANDED",
+            )
+        )
+
+        await session.commit()
+
+        logger.info(
+            f"Fetched and wrote {source_name} endpoint=%s records=%s file=%s",
+            endpoint_name,
+            write_result.record_count,
+            write_result.file_path,
+        )
