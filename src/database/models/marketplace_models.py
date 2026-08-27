@@ -236,7 +236,7 @@ class WayfairPaymentSchema(_BasePayoutSchema):
     business: Optional[str] = None
     order_type: Optional[str] = None
 
-    source_file: Optional[str] = None
+    source_file: str
     source_row: int
 
     @field_validator(
@@ -308,7 +308,7 @@ class WayfairPayment(Base):
     business: Mapped[Optional[str]] = mapped_column(String(64))
     order_type: Mapped[Optional[str]] = mapped_column(String(64))
 
-    source_file: Mapped[Optional[str]] = mapped_column(String(255))
+    source_file: Mapped[str] = mapped_column(String(255), nullable=False)
     source_row: Mapped[int] = mapped_column(Integer, nullable=False)
 
     payload: Mapped[dict[str, Any]] = mapped_column(
@@ -366,7 +366,7 @@ class WayfairDeductionSchema(_BasePayoutSchema):
     reason: Optional[str] = None
     description: Optional[str] = None
 
-    source_file: Optional[str] = None
+    source_file: str
     source_row: int
 
     @field_validator(
@@ -422,7 +422,7 @@ class WayfairDeduction(Base):
     reason: Mapped[Optional[str]] = mapped_column(String(128))
     description: Mapped[Optional[str]] = mapped_column(Text)
 
-    source_file: Mapped[Optional[str]] = mapped_column(String(255))
+    source_file: Mapped[str] = mapped_column(String(255), nullable=False)
     source_row: Mapped[int] = mapped_column(Integer, nullable=False)
 
     payload: Mapped[dict[str, Any]] = mapped_column(
@@ -738,7 +738,7 @@ class BbbPayoutSchema(_BasePayoutSchema):
     unit_price: Optional[Decimal] = None
     total_amount: Optional[Decimal] = None
 
-    source_file: Optional[str] = None
+    source_file: str
     source_row: int
 
     @field_validator(
@@ -797,7 +797,7 @@ class BbbPayout(Base):
     unit_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 4))
     total_amount: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 4))
 
-    source_file: Mapped[Optional[str]] = mapped_column(String(255), nullable=False)
+    source_file: Mapped[str] = mapped_column(String(255), nullable=False)
     source_row: Mapped[int] = mapped_column(Integer, nullable=False)
 
     payload: Mapped[dict[str, Any]] = mapped_column(

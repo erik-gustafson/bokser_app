@@ -59,8 +59,8 @@ SessionLocal = sessionmaker(
 def init_db() -> None:
     if getattr(settings, "auto_create_tables", False):
         with sync_engine.begin() as connection:
-            connection.execute(text("CREATE SCHEMA IF NOT EXISTS acenda"))
-            connection.execute(text("CREATE SCHEMA IF NOT EXISTS sos"))
+            for schema_name in ("acenda", "sos", "bh_api", "order_data"):
+                connection.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
             Base.metadata.create_all(bind=connection)
 
 

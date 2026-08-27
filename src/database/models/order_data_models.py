@@ -174,11 +174,13 @@ class GuestSupplyPODetail(Base):
     """
 
     __tablename__ = "guest_supply_po_details"
-    __table_args__ = {"schema": ORDER_DATA_SCHEMA}
 
     po_number: Mapped[str] = mapped_column(
         String(50),
-        ForeignKey("guest_supply_po_headers.po_number", ondelete="CASCADE"),
+        ForeignKey(
+            f"{ORDER_DATA_SCHEMA}.guest_supply_po_headers.po_number",
+            ondelete="CASCADE",
+        ),
         nullable=False,
     )
     line_num: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -210,6 +212,7 @@ class GuestSupplyPODetail(Base):
         ),
         Index("idx_guest_supply_po_detail_po_number", "po_number"),
         Index("idx_guest_supply_po_detail_sku", "sku"),
+        {"schema": ORDER_DATA_SCHEMA},
     )
 
     class Ingest:

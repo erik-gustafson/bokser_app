@@ -83,4 +83,6 @@ class DataLakeCursors(Base):
 
     source_name: Mapped[str] = mapped_column(String(64), index=True, primary_key=True)
     entity_name: Mapped[str] = mapped_column(String(64), index=True, primary_key=True)
-    last_sucessful_run: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_successful_run: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
