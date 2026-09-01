@@ -84,7 +84,7 @@ async def im_webhook_new(
             raw_writer=raw_writer,
             records=records,
             source_name="ksp",
-            endpoint_name="im_webhooks",
+            endpoint_name=event_type_str,
         )
 
     return {"ok": True}
@@ -169,7 +169,7 @@ async def productiv_webhook(
             raw_writer=raw_writer,
             records=payload,
             source_name="productiv",
-            endpoint_name="productiv_webhooks",
+            endpoint_name=event_type_str,
         )
 
     return {"ok": True}
