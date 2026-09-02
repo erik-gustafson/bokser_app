@@ -45,7 +45,7 @@ async def acenda_main() -> None:
 
 if __name__ == "__main__":
 
-    asyncio.run(shipment_load_to_db(limit=1))
+    asyncio.run(shipment_load_to_db(limit=150))
 
     acenda_order_push = AcendaOrderPush()
 

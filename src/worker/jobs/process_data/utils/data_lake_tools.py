@@ -98,7 +98,8 @@ def extract_json_records(
 
     if not isinstance(records, list):
         if isinstance(records, dict):
-            records = records.values()
+            record_list: list[dict[str, Any]] = records["orders"]
+            return record_list
         else:
             raise ValueError(f"Expected payload list in {path}")
 

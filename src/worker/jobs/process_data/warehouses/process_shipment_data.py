@@ -14,6 +14,8 @@ from src.worker.jobs.process_data.utils import data_lake_tools
 
 from src.database.models import *
 from src.database.utils import model_tools
+from src.database.utils.formatter_tools import parse_dt, as_str, as_float, as_int
+
 from src.database.database import async_session
 
 logger = logging.getLogger(__name__)
@@ -189,6 +191,7 @@ async def load_shipment_records(
     mapper = ShipmentPayloadMapper()
 
     loaded = 0
+    skipped = 0
     failed: list[dict[str, Any]] = []
 
     for raw_record in records:
@@ -197,21 +200,16 @@ async def load_shipment_records(
             if warehouse == "ksp":
                 record_id = raw_record.get("cust_ref", "No cust_ref provided!")
                 data = mapper.map_ksp_shipment(data=raw_record)
-                model = KSPShipmentHeaders
+
                 async with session.begin_nested():
                     await post_ksp_shipment_data(session, data)
 
-            # elif payload_type == "ship_advice":
-            #     data = mapper.map_ship_advice_header(data=raw_record)
-            #     model = AcendaShipAdviceHeaders
+            elif warehouse == "productiv":
+                record_id = raw_record.get("cust_ref", "No cust_ref provided!")
+                data = mapper.map_ksp_shipment(data=raw_record)
 
-            # elif payload_type == "fulfillment":
-            #     data = mapper.map_acenda_fulfillment(data=raw_record)
-            #     model = AcendaFulfillments
-
-            # elif payload_type == "return":
-            #     data = mapper.map_acenda_return(data=raw_record)
-            #     model = AcendaOrderReturns
+                async with session.begin_nested():
+                    await post_ksp_shipment_data(session, data)
 
             else:
                 raise ValueError(f"Unsupported warehouse type: {warehouse}")
@@ -235,6 +233,7 @@ async def load_shipment_records(
 
     return {
         "loaded": loaded,
+        "skipped": skipped,
         "failed": failed,
     }
 
@@ -243,7 +242,7 @@ async def post_ksp_shipment_data(session: AsyncSession, data: KSPShipmentHeaders
 
     existing_shipment = await session.get(
         KSPShipmentHeaders,
-        data.cust_ref,
+        (data.cust_ref, data.cust_po_no),
         options=[
             selectinload(KSPShipmentHeaders.ship_details).selectinload(
                 KSPShipmentDetails.items
@@ -255,21 +254,29 @@ async def post_ksp_shipment_data(session: AsyncSession, data: KSPShipmentHeaders
         session.add(data)
         return
 
+    incoming_details = list(data.ship_details)
+    data.ship_details.clear()
+
     model_tools.update_model(
         existing_shipment,
         data,
-        exclude={"cust_ref"},
+        exclude={"cust_ref", "cust_po_no"},
     )
 
     existing_details = {
         detail.tracking_no: detail for detail in existing_shipment.ship_details
     }
 
-    for incoming_detail in data.ship_details:
+    for incoming_detail in incoming_details:
+        incoming_items = list(incoming_detail.items)
+        incoming_detail.items.clear()
+
         existing_detail = existing_details.get(incoming_detail.tracking_no)
 
         if existing_detail is None:
+            incoming_detail.items.extend(incoming_items)
             existing_shipment.ship_details.append(incoming_detail)
+            existing_details[incoming_detail.tracking_no] = incoming_detail
             continue
 
         model_tools.update_model(
@@ -280,11 +287,12 @@ async def post_ksp_shipment_data(session: AsyncSession, data: KSPShipmentHeaders
 
         existing_items = {item.item: item for item in existing_detail.items}
 
-        for incoming_item in incoming_detail.items:
+        for incoming_item in incoming_items:
             existing_item = existing_items.get(incoming_item.item)
 
             if existing_item is None:
                 existing_detail.items.append(incoming_item)
+                existing_items[incoming_item.item] = incoming_item
                 continue
 
             model_tools.update_model(
@@ -299,10 +307,10 @@ class ShipmentPayloadMapper:
     def map_ksp_shipment(self, data: dict[str, Any]) -> KSPShipmentHeaders:
 
         ksp_shipment = KSPShipmentHeaders(
-            cust_ref=data.get("cust_ref"),
-            cust_po_no=data.get("cust_po_no"),
-            delivered_to_wms_date=data.get("delivered_to_wms_date"),
-            order_status=data.get("order_status"),
+            cust_ref=as_str(data.get("cust_ref")),
+            cust_po_no=as_str(data.get("cust_po_no")),
+            delivered_to_wms_date=parse_dt(data.get("delivered_to_wms_date")),
+            order_status=as_str(data.get("order_status")),
         )
 
         ksp_shipment.ship_details = [
@@ -323,17 +331,17 @@ class ShipmentPayloadMapper:
     ) -> KSPShipmentDetails:
 
         shipment_details = KSPShipmentDetails(
-            cust_ref=cust_ref,
-            carrier=data.get("carrier"),
-            method=data.get("method"),
-            tracking_no=data.get("tracking_no"),
-            tracking_no_secondary=data.get("tracking_no_secondary"),
-            total_cost=data.get("total_cost"),
-            package_weight_lbs=data.get("package_weight_lbs"),
-            dim_weight_lbs=data.get("dim_weight_lbs"),
-            zone=data.get("zone"),
-            delivery_surcharge_type=data.get("delivery_surcharge_type"),
-            date=data.get("date"),
+            cust_ref=as_str(cust_ref),
+            carrier=as_str(data.get("carrier")),
+            method=as_str(data.get("method")),
+            tracking_no=as_str(data.get("tracking_no")),
+            tracking_no_secondary=as_str(data.get("tracking_no_secondary")),
+            total_cost=as_float(data.get("total_cost")),
+            package_weight_lbs=as_float(data.get("package_weight_lbs")),
+            dim_weight_lbs=as_float(data.get("dim_weight_lbs")),
+            zone=as_str(data.get("zone")),
+            delivery_surcharge_type=as_str(data.get("delivery_surcharge_type")),
+            date=parse_dt(data.get("date")),
             custom_1=data.get("custom_1"),
             custom_2=data.get("custom_2"),
             custom_3=data.get("custom_3"),
@@ -356,16 +364,16 @@ class ShipmentPayloadMapper:
     ) -> KSPShipmentDetailItems:
 
         return KSPShipmentDetailItems(
-            tracking_no=tracking_no,
-            item=data.get("item"),
-            quantity=data.get("quantity"),
-            carton_code=data.get("carton_code"),
-            carton_num=data.get("carton_num"),
-            box_length_in=data.get("box_length_in"),
-            box_width_in=data.get("box_width_in"),
-            box_height_in=data.get("box_height_in"),
-            package_weight_lbs=data.get("package_weight_lbs"),
-            lot_code=data.get("lot_code"),
-            serial_no=data.get("serial_no"),
-            custom_1=data.get("custom_1"),
+            tracking_no=as_str(tracking_no),
+            item=as_str(data.get("item")),
+            quantity=as_int(data.get("quantity")),
+            carton_code=as_str(data.get("carton_code")),
+            carton_num=as_str(data.get("carton_num")),
+            box_length_in=as_str(data.get("box_length_in")),
+            box_width_in=as_str(data.get("box_width_in")),
+            box_height_in=as_str(data.get("box_height_in")),
+            package_weight_lbs=as_str(data.get("package_weight_lbs")),
+            lot_code=as_str(data.get("lot_code")),
+            serial_no=as_str(data.get("serial_no")),
+            custom_1=as_str(data.get("custom_1")),
         )
