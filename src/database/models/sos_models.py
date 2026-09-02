@@ -602,11 +602,11 @@ class SosSalesReceiptHeader(Base):
         back_populates="header",
         cascade="all, delete-orphan",
     )
-    linked_transactions: Mapped[
-        list["SosSalesReceiptHeaderLinkedTransactions"]
-    ] = relationship(
-        back_populates="header",
-        cascade="all, delete-orphan",
+    linked_transactions: Mapped[list["SosSalesReceiptHeaderLinkedTransactions"]] = (
+        relationship(
+            back_populates="header",
+            cascade="all, delete-orphan",
+        )
     )
 
 
@@ -659,11 +659,11 @@ class SosSalesReceiptLine(Base):
     serials_raw: Mapped[list[Any] | None] = mapped_column(JSON, nullable=True)
 
     header: Mapped["SosSalesReceiptHeader"] = relationship(back_populates="lines")
-    linked_transactions: Mapped[
-        list["SosSalesReceiptLineLinkedTransactions"]
-    ] = relationship(
-        back_populates="line",
-        cascade="all, delete-orphan",
+    linked_transactions: Mapped[list["SosSalesReceiptLineLinkedTransactions"]] = (
+        relationship(
+            back_populates="line",
+            cascade="all, delete-orphan",
+        )
     )
 
 
@@ -934,9 +934,7 @@ class SosEstimateLineLinkedTransactions(Base):
     line_number: Mapped[int] = mapped_column(Integer, primary_key=True)
     ref_number: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    line: Mapped["SosEstimateLine"] = relationship(
-        back_populates="linked_transactions"
-    )
+    line: Mapped["SosEstimateLine"] = relationship(back_populates="linked_transactions")
 
 
 class SosShipmentHeader(Base):
@@ -1256,11 +1254,9 @@ class SosReturnLine(Base):
     serials_raw: Mapped[list[Any] | None] = mapped_column(JSON, nullable=True)
 
     header: Mapped["SosReturnHeader"] = relationship(back_populates="lines")
-    linked_transactions: Mapped[list["SosReturnLineLinkedTransactions"]] = (
-        relationship(
-            back_populates="line",
-            cascade="all, delete-orphan",
-        )
+    linked_transactions: Mapped[list["SosReturnLineLinkedTransactions"]] = relationship(
+        back_populates="line",
+        cascade="all, delete-orphan",
     )
 
 
@@ -1394,11 +1390,9 @@ class SosRmaHeader(Base):
         back_populates="header",
         cascade="all, delete-orphan",
     )
-    linked_transactions: Mapped[list["SosRmaHeaderLinkedTransactions"]] = (
-        relationship(
-            back_populates="header",
-            cascade="all, delete-orphan",
-        )
+    linked_transactions: Mapped[list["SosRmaHeaderLinkedTransactions"]] = relationship(
+        back_populates="header",
+        cascade="all, delete-orphan",
     )
 
 
@@ -1451,11 +1445,9 @@ class SosRmaLine(Base):
     serials_raw: Mapped[list[Any] | None] = mapped_column(JSON, nullable=True)
 
     header: Mapped["SosRmaHeader"] = relationship(back_populates="lines")
-    linked_transactions: Mapped[list["SosRmaLineLinkedTransactions"]] = (
-        relationship(
-            back_populates="line",
-            cascade="all, delete-orphan",
-        )
+    linked_transactions: Mapped[list["SosRmaLineLinkedTransactions"]] = relationship(
+        back_populates="line",
+        cascade="all, delete-orphan",
     )
 
 
@@ -1488,9 +1480,7 @@ class SosRmaHeaderLinkedTransactions(Base):
     line_number: Mapped[int] = mapped_column(Integer, primary_key=True)
     ref_number: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    header: Mapped["SosRmaHeader"] = relationship(
-        back_populates="linked_transactions"
-    )
+    header: Mapped["SosRmaHeader"] = relationship(back_populates="linked_transactions")
 
 
 class SosRmaLineLinkedTransactions(Base):
@@ -1594,18 +1584,14 @@ class SosPurchaseOrderHeader(Base):
     open_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
     drop_ship: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     blanket_po: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
-    contract_manufacturing: Mapped[bool | None] = mapped_column(
-        Boolean, nullable=True
-    )
+    contract_manufacturing: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     confirmed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     closed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     archived: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     pending_approval: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     summary_only: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     has_signature: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
-    update_default_costs: Mapped[bool | None] = mapped_column(
-        Boolean, nullable=True
-    )
+    update_default_costs: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     sync_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_sync: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -1621,11 +1607,11 @@ class SosPurchaseOrderHeader(Base):
         back_populates="header",
         cascade="all, delete-orphan",
     )
-    linked_transactions: Mapped[
-        list["SosPurchaseOrderHeaderLinkedTransactions"]
-    ] = relationship(
-        back_populates="header",
-        cascade="all, delete-orphan",
+    linked_transactions: Mapped[list["SosPurchaseOrderHeaderLinkedTransactions"]] = (
+        relationship(
+            back_populates="header",
+            cascade="all, delete-orphan",
+        )
     )
 
 
@@ -1670,11 +1656,11 @@ class SosPurchaseOrderLine(Base):
     serials_raw: Mapped[list[Any] | None] = mapped_column(JSON, nullable=True)
 
     header: Mapped["SosPurchaseOrderHeader"] = relationship(back_populates="lines")
-    linked_transactions: Mapped[
-        list["SosPurchaseOrderLineLinkedTransactions"]
-    ] = relationship(
-        back_populates="line",
-        cascade="all, delete-orphan",
+    linked_transactions: Mapped[list["SosPurchaseOrderLineLinkedTransactions"]] = (
+        relationship(
+            back_populates="line",
+            cascade="all, delete-orphan",
+        )
     )
 
 
@@ -2381,9 +2367,7 @@ class SosPaymentLineLinkedTransactions(Base):
     line_number: Mapped[int] = mapped_column(Integer, primary_key=True)
     ref_number: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    line: Mapped["SosPaymentLine"] = relationship(
-        back_populates="linked_transactions"
-    )
+    line: Mapped["SosPaymentLine"] = relationship(back_populates="linked_transactions")
 
 
 class SosAdjustmentHeader(Base):
@@ -2464,9 +2448,12 @@ class SosAdjustmentCustomField(Base):
     value: Mapped[str | None] = mapped_column(Text, nullable=True)
     data_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
-    header: Mapped["SosAdjustmentHeader"] = relationship(
-        back_populates="custom_fields"
-    )
+    header: Mapped["SosAdjustmentHeader"] = relationship(back_populates="custom_fields")
+
+
+### ---------------------------------------- ###
+### ------------- Sync Tables -------------- ###
+### ---------------------------------------- ###
 
 
 class SosSalesOrderSync(Base):
@@ -2475,6 +2462,48 @@ class SosSalesOrderSync(Base):
     """
 
     __tablename__ = "sales_order_sync"
+    __table_args__ = (
+        UniqueConstraint(
+            "source", "source_line_key", name="ux_sos_order_sync_source_line"
+        ),
+        {"schema": SOS_SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_header_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    source_line_key: Mapped[str] = mapped_column(String(512), nullable=False)
+
+    payload_hash: Mapped[str | None] = mapped_column(String(255))
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="pending", server_default="pending"
+    )
+    attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    last_error: Mapped[str | None] = mapped_column(Text)
+
+    sos_order_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    sos_line_id: Mapped[int | None] = mapped_column(Integer)
+    last_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class SosShipmentSync(Base):
+    """
+    Track SOS Shipment create posts for idempotency and external ID mapping.
+    """
+
+    __tablename__ = "shipment_sync"
     __table_args__ = (
         UniqueConstraint(
             "source", "source_line_key", name="ux_sos_order_sync_source_line"

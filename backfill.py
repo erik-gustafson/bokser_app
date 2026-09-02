@@ -8,11 +8,20 @@ from datetime import datetime, timezone
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from sqlalchemy import select, or_, and_
+
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 
+from src.core.config import settings
+
+from src.storage.raw.writer import RawPayloadWriter
+
 from src.database.database import async_session
 from src.database.models.data_lake_models import DataLakeFile
+from src.database.models import BokserAPIWebhookEvent
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +207,92 @@ async def queue_lake_files_from_path(
     }
 
 
+async def sort_webhook_files():
+
+    raw_writer = RawPayloadWriter(Path(r"X:\data_lake\prod"))
+    order_updates = []
+    new_orders = []
+
+    async with async_session() as session:
+
+        stmt = (
+            select(BokserAPIWebhookEvent)
+            .where(BokserAPIWebhookEvent.source == "ksp")
+            .order_by(BokserAPIWebhookEvent.id)
+        )
+
+        events = (await session.execute(stmt)).scalars().all()
+
+    for event in events:
+        if event.event_type == "order_update":
+            order_updates.append(event.payload)
+        if event.event_type == "order_new":
+            new_orders.append(event.payload)
+
+    await write_payload_to_data_lake(
+        raw_writer=raw_writer,
+        records=order_updates,
+        source_name="ksp",
+        endpoint_name="order_update",
+    )
+
+    await write_payload_to_data_lake(
+        raw_writer=raw_writer,
+        records=new_orders,
+        source_name="ksp",
+        endpoint_name="order_new",
+    )
+
+
+async def write_payload_to_data_lake(
+    raw_writer: RawPayloadWriter,
+    records: list[Any],
+    source_name: str,
+    endpoint_name: str,
+):
+
+    async with async_session() as session:
+
+        if records:
+            write_result = raw_writer.write_json_payload(
+                source_system=source_name,
+                entity_name=endpoint_name,
+                payload=records,
+            )
+
+            file_path = str(write_result.file_path).replace(
+                "X:\\data_lake", "\\app\\data_lake"
+            )
+
+            file_path = file_path.replace("\\", "/")
+
+            session.add(
+                DataLakeFile(
+                    source_name=source_name,
+                    entity_name=endpoint_name,
+                    file_path=file_path,
+                    file_name=write_result.file_name,
+                    record_count=write_result.record_count,
+                    file_size_bytes=write_result.file_size_bytes,
+                    sha256=write_result.sha256,
+                    landed_at=write_result.written_at_utc,
+                    status="LANDED",
+                )
+            )
+
+            await session.commit()
+
+        logger.info(
+            f"Fetched and wrote {source_name} endpoint=%s records=%s file=%s",
+            endpoint_name,
+            write_result.record_count,
+            write_result.file_path,
+        )
+
+
 if __name__ == "__main__":
+
+    asyncio.run(sort_webhook_files())
 
     result = asyncio.run(
         queue_lake_files_from_path(

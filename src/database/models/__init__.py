@@ -9,3 +9,5 @@ from .error_log_models import *
 from .bokser_api_models import *
 from .order_data_models import *
 from .marketplace_models import *
+from .ksp_models import *
+from .productiv_models import *

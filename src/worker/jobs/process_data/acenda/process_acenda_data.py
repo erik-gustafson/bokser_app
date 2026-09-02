@@ -28,6 +28,8 @@ from src.database.models.acenda_models import (
 )
 from src.database.models.data_lake_models import DataLakeFile
 
+from src.worker.jobs.process_data.utils import data_lake_tools
+
 from src.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -102,41 +104,18 @@ def require_datetime(data: dict[str, Any], field_name: str) -> datetime:
 
 
 async def acenda_load_to_db() -> None:
-    order_entities = ["new_orders", "updated_orders", "acenda_orders"]
-    return_entities = ["acenda_returns"]
 
-    ship_advice_entities = [
-        "new_ship_advices",
-        "updated_ship_advices",
+    acenda_entities = (
+        "acenda_orders",
         "acenda_ship_advices",
-    ]
-
-    fulfillment_entities = ["acenda_fulfillments"]
+        "acenda_fulfillments",
+        "acenda_returns",
+        # "acenda_channel_item_status",
+    )
 
     total_results = []
 
-    for entity_name in order_entities:
-        result = await load_acenda_lake_files(
-            entity_name=entity_name,
-            limit=50,
-        )
-        total_results.append((entity_name, result))
-
-    for entity_name in return_entities:
-        result = await load_acenda_lake_files(
-            entity_name=entity_name,
-            limit=50,
-        )
-        total_results.append((entity_name, result))
-
-    for entity_name in ship_advice_entities:
-        result = await load_acenda_lake_files(
-            entity_name=entity_name,
-            limit=50,
-        )
-        total_results.append((entity_name, result))
-
-    for entity_name in fulfillment_entities:
+    for entity_name in acenda_entities:
         result = await load_acenda_lake_files(
             entity_name=entity_name,
             limit=50,
@@ -151,7 +130,7 @@ async def acenda_load_to_db() -> None:
 
 async def load_acenda_lake_files(
     *,
-    entity_name: str | None = None,
+    entity_name: str,
     limit: int = 25,
 ) -> dict[str, Any]:
     total_loaded = 0
@@ -161,7 +140,7 @@ async def load_acenda_lake_files(
     # Step 1: claim files in a short transaction.
     async with async_session() as session:
         async with session.begin():
-            claimed_files = await claim_lake_files(
+            claimed_files = await data_lake_tools.claim_lake_files(
                 session,
                 source_name="acenda",
                 entity_name=entity_name,
@@ -176,20 +155,18 @@ async def load_acenda_lake_files(
             with path.open("r", encoding="utf-8") as f:
                 file_data = json.load(f)
 
-            records = extract_json_records(
+            records = data_lake_tools.extract_json_records(
                 file_data,
                 path=path,
                 expected_entity_name=lake_file.entity_name,
             )
-
-            payload_type = settings.acenda_payload_type(lake_file.entity_name)
 
             async with async_session() as session:
                 async with session.begin():
                     result = await load_acenda_records(
                         session=session,
                         records=records,
-                        payload_type=payload_type,
+                        payload_type=entity_name,
                     )
 
                     db_file = await session.get(
@@ -271,60 +248,6 @@ async def load_acenda_lake_files(
     }
 
 
-async def claim_lake_files(
-    session: AsyncSession,
-    *,
-    source_name: str | None = None,
-    entity_name: str | None = None,
-    limit: int = 25,
-) -> list[ClaimedLakeFile]:
-
-    stale_processing_before = datetime.now(timezone.utc) - timedelta(minutes=30)
-
-    stmt = (
-        select(DataLakeFile)
-        .where(
-            or_(
-                DataLakeFile.status.in_(RETRYABLE_LAKE_FILE_STATUSES),
-                and_(
-                    DataLakeFile.status == "PROCESSING",
-                    DataLakeFile.claimed_at < stale_processing_before,
-                ),
-            )
-        )
-        .order_by(DataLakeFile.id)
-        .limit(limit)
-        .with_for_update(skip_locked=True)
-    )
-
-    if source_name:
-        stmt = stmt.where(DataLakeFile.source_name == source_name)
-
-    if entity_name:
-        stmt = stmt.where(DataLakeFile.entity_name == entity_name)
-
-    result = await session.execute(stmt)
-    files = list(result.scalars().all())
-
-    claimed_files: list[ClaimedLakeFile] = []
-
-    for file in files:
-        file.status = "PROCESSING"
-        file.attempt_count += 1
-        file.claimed_at = datetime.now(timezone.utc)
-
-        claimed_files.append(
-            ClaimedLakeFile(
-                id=file.id,
-                file_path=file.file_path,
-                source_name=file.source_name,
-                entity_name=file.entity_name,
-            )
-        )
-
-    return claimed_files
-
-
 async def load_acenda_records(
     session: AsyncSession,
     records: list[dict[str, Any]],
@@ -393,33 +316,6 @@ async def load_acenda_records(
         "skipped": skipped,
         "failed": failed,
     }
-
-
-def extract_json_records(
-    payload: Any, *, path: Path, expected_entity_name: str | None = None
-) -> list[dict[str, Any]]:
-    if not isinstance(payload, dict):
-        raise ValueError(f"Expected wrapped lake JSON object in {path}")
-
-    metadata = payload.get("metadata")
-    records = payload.get("payload")
-
-    if not isinstance(metadata, dict):
-        raise ValueError(f"Missing or invalid metadata in {path}")
-
-    if expected_entity_name and metadata.get("entity_name") != expected_entity_name:
-        raise ValueError(
-            f"Entity mismatch in {path}: "
-            f"manifest={expected_entity_name}, file={metadata.get('entity_name')}"
-        )
-
-    if not isinstance(records, list):
-        raise ValueError(f"Expected payload list in {path}")
-
-    if any(not isinstance(record, dict) for record in records):
-        raise ValueError(f"Payload contains non-object records in {path}")
-
-    return records
 
 
 class AcendaPayloadMapper:

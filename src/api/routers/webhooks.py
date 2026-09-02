@@ -49,9 +49,10 @@ async def im_webhook_new(
         logger.exception("Signature verify error: %s", exc)
 
     try:
-        records = await request.json()
+        _records = await request.json()
+        records: list[Any] = _records.get("orders", [])
     except Exception:
-        records = {}
+        records = []
 
     event_type_str = str(x_webhook_event or "unknown").strip() or "unknown"
 
@@ -61,7 +62,7 @@ async def im_webhook_new(
             source="ksp",
             event_type=event_type_str,
             signature_valid=bool(signature_valid),
-            payload=records or {},
+            payload=records or [],
         )
     )
 
@@ -294,7 +295,7 @@ def _verify_ups_track_alert_bearer(authorization: str | None) -> bool:
 async def write_payload_to_data_lake(
     session: AsyncSession,
     raw_writer: RawPayloadWriter,
-    records: dict[str, Any],
+    records: dict[str, Any] | list[Any],
     source_name: str,
     endpoint_name: str,
 ):
