@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 
@@ -18,6 +19,16 @@ def as_float(value: Any) -> float:
 
 def as_int(value: Any) -> int:
     return 0 if value is None else int(value)
+
+
+def as_decimal(value: Any) -> Decimal | None:
+    if value is None or value == "":
+        return None
+
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValueError(f"Cannot convert {value!r} to Decimal") from exc
 
 
 def require_positive_int(data: dict[str, Any], field_name: str) -> int:

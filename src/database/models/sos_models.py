@@ -2506,7 +2506,7 @@ class SosShipmentSync(Base):
     __tablename__ = "shipment_sync"
     __table_args__ = (
         UniqueConstraint(
-            "source", "source_line_key", name="ux_sos_order_sync_source_line"
+            "source", "source_line_key", name="ux_sos_shipment_sync_source_line"
         ),
         {"schema": SOS_SCHEMA},
     )

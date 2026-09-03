@@ -2,27 +2,36 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, ForeignKey
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.database import Base
 
-KSP_SCHEMA = "warehouse_data"
+WAREHOUSE_SCHEMA = "warehouse_data"
 
 
 class KSPShipmentHeaders(Base):
     __tablename__ = "ksp_ship_headers"
-    __table_args__ = {"schema": KSP_SCHEMA}
-
-    cust_ref: Mapped[str] = mapped_column(
-        String, index=True, unique=True, primary_key=True
+    __table_args__ = (
+        UniqueConstraint(
+            "cust_ref",
+            "cust_po_no",
+            name="uq_ksp_ship_headers_cust_ref_po",
+        ),
+        {"schema": WAREHOUSE_SCHEMA},
     )
-    cust_po_no: Mapped[str] = mapped_column(String, index=True, primary_key=True)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    cust_ref: Mapped[str] = mapped_column(String)
+    cust_po_no: Mapped[str] = mapped_column(String, index=True)
+
     delivered_to_wms_date: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         index=True,
         nullable=True,
     )
+
     order_status: Mapped[str] = mapped_column(String, index=True)
 
     ship_details: Mapped[list["KSPShipmentDetails"]] = relationship(
@@ -33,11 +42,25 @@ class KSPShipmentHeaders(Base):
 
 class KSPShipmentDetails(Base):
     __tablename__ = "ksp_ship_details"
-    __table_args__ = {"schema": KSP_SCHEMA}
+    __table_args__ = (
+        UniqueConstraint(
+            "tracking_no",
+            name="uq_ksp_ship_details_tracking_no",
+        ),
+        Index(
+            "ix_warehouse_data_ksp_ship_details_shipment_header_id",
+            "ship_header_id",
+        ),
+        {"schema": WAREHOUSE_SCHEMA},
+    )
 
-    cust_ref: Mapped[str] = mapped_column(
-        ForeignKey(f"{KSP_SCHEMA}.ksp_ship_headers.cust_ref"),
-        index=True,
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    ship_header_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            f"{WAREHOUSE_SCHEMA}.ksp_ship_headers.id",
+            ondelete="CASCADE",
+        ),
         nullable=False,
     )
 
@@ -45,25 +68,17 @@ class KSPShipmentDetails(Base):
     method: Mapped[str] = mapped_column(String)
 
     tracking_no: Mapped[str] = mapped_column(
-        String, index=True, unique=True, primary_key=True
-    )
-    tracking_no_secondary: Mapped[str | None] = mapped_column(
-        String(128), nullable=True
+        String,
+        nullable=False,
     )
 
-    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+    )
 
-    total_cost: Mapped[float] = mapped_column(default=0.0)
     package_weight_lbs: Mapped[float] = mapped_column(default=0.0)
     dim_weight_lbs: Mapped[float] = mapped_column(default=0.0)
-    zone: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    delivery_surcharge_type: Mapped[str | None] = mapped_column(
-        String(128), nullable=True
-    )
-
-    custom_1: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    custom_2: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    custom_3: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     ship_headers: Mapped["KSPShipmentHeaders"] = relationship(
         back_populates="ship_details",
@@ -77,25 +92,28 @@ class KSPShipmentDetails(Base):
 
 class KSPShipmentDetailItems(Base):
     __tablename__ = "ksp_ship_detail_items"
-    __table_args__ = {"schema": KSP_SCHEMA}
+    __table_args__ = (
+        UniqueConstraint(
+            "ship_detail_id",
+            "item",
+            name="uq_ksp_ship_detail_items_detail_item",
+        ),
+        {"schema": WAREHOUSE_SCHEMA},
+    )
 
-    tracking_no: Mapped[str] = mapped_column(
-        ForeignKey(f"{KSP_SCHEMA}.ksp_ship_details.tracking_no"),
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    ship_detail_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            f"{WAREHOUSE_SCHEMA}.ksp_ship_details.id",
+            ondelete="CASCADE",
+        ),
         index=True,
         nullable=False,
-        primary_key=True,
     )
-    item: Mapped[str] = mapped_column(String, index=True, primary_key=True)
+
+    item: Mapped[str] = mapped_column(String, index=True)
     quantity: Mapped[int] = mapped_column(Integer)
-    carton_code: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    carton_num: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    box_length_in: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    box_width_in: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    box_height_in: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    package_weight_lbs: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    lot_code: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    serial_no: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    custom_1: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     ship_details: Mapped["KSPShipmentDetails"] = relationship(
         back_populates="items",

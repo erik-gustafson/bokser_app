@@ -137,7 +137,7 @@ async def productiv_webhook(
         logger.exception("Signature verify error (productiv): %s", exc)
 
     event_type = payload.get("eventType") if isinstance(payload, dict) else "unknown"
-    event_type_str = str(event_type or "unknown")
+    event_type_str = str(event_type or "unknown").lower()
 
     # --- Always log the webhook event (audit trail) --- #
     db.add(

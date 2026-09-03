@@ -14,14 +14,20 @@ from src.worker.jobs.process_data.utils import data_lake_tools
 
 from src.database.models import *
 from src.database.utils import model_tools
-from src.database.utils.formatter_tools import parse_dt, as_str, as_float, as_int
+from src.database.utils.formatter_tools import (
+    parse_dt,
+    as_str,
+    as_float,
+    as_int,
+    as_decimal,
+)
 
 from src.database.database import async_session
 
 logger = logging.getLogger(__name__)
 
 
-SHIPMENT_ENTITIES = [("ksp", "order_update"), ("productiv", "orderconfirm")]
+SHIPMENT_ENTITIES = [("ksp", "order_update"), ("productiv", "OrderConfirm")]
 
 ### local dev begin ###
 
@@ -149,8 +155,10 @@ async def load_whse_shipment_lake_files(
 
         except Exception as exc:
             logger.exception(
-                "Failed to load Acenda lake file id=%s path=%s",
+                "Failed to load warehouse shipment lake file "
+                "id=%s source=%s path=%s",
                 lake_file.id,
+                source_name,
                 lake_file.file_path,
             )
 
@@ -188,28 +196,46 @@ async def load_shipment_records(
     warehouse: str,
 ) -> dict[str, Any]:
 
-    mapper = ShipmentPayloadMapper()
-
     loaded = 0
     skipped = 0
     failed: list[dict[str, Any]] = []
 
     for raw_record in records:
+        record_id: Any = None
 
         try:
             if warehouse == "ksp":
-                record_id = raw_record.get("cust_ref", "No cust_ref provided!")
-                data = mapper.map_ksp_shipment(data=raw_record)
+                record_id = raw_record.get(
+                    "cust_ref",
+                    "No cust_ref provided!",
+                )
+
+                shipment = KSPShipmentMapper.map_shipment(raw_record)
 
                 async with session.begin_nested():
-                    await post_ksp_shipment_data(session, data)
+                    await post_ksp_shipment_data(
+                        session,
+                        shipment,
+                    )
 
             elif warehouse == "productiv":
-                record_id = raw_record.get("cust_ref", "No cust_ref provided!")
-                data = mapper.map_ksp_shipment(data=raw_record)
+                body = raw_record.get("resource", {}).get("body", {})
+
+                record_id = body.get(
+                    "readOnly",
+                    {},
+                ).get(
+                    "orderId",
+                    "No Productiv orderId provided!",
+                )
+
+                shipment = ProductivShipmentMapper.map_shipment(raw_record)
 
                 async with session.begin_nested():
-                    await post_ksp_shipment_data(session, data)
+                    await post_productiv_shipment_data(
+                        session,
+                        shipment,
+                    )
 
             else:
                 raise ValueError(f"Unsupported warehouse type: {warehouse}")
@@ -218,7 +244,8 @@ async def load_shipment_records(
 
         except Exception as exc:
             logger.exception(
-                "Failed to process record %s",
+                "Failed to process %s shipment record %s",
+                warehouse,
                 record_id,
             )
 
@@ -229,8 +256,6 @@ async def load_shipment_records(
                 }
             )
 
-            continue
-
     return {
         "loaded": loaded,
         "skipped": skipped,
@@ -238,19 +263,27 @@ async def load_shipment_records(
     }
 
 
-async def post_ksp_shipment_data(session: AsyncSession, data: KSPShipmentHeaders):
+async def post_ksp_shipment_data(
+    session: AsyncSession,
+    data: KSPShipmentHeaders,
+) -> None:
 
-    existing_shipment = await session.get(
-        KSPShipmentHeaders,
-        (data.cust_ref, data.cust_po_no),
-        options=[
+    stmt = (
+        select(KSPShipmentHeaders)
+        .where(
+            KSPShipmentHeaders.cust_ref == data.cust_ref,
+            KSPShipmentHeaders.cust_po_no == data.cust_po_no,
+        )
+        .options(
             selectinload(KSPShipmentHeaders.ship_details).selectinload(
                 KSPShipmentDetails.items
             )
-        ],
+        )
     )
 
-    if existing_shipment is None:
+    existing = await session.scalar(stmt)
+
+    if existing is None:
         session.add(data)
         return
 
@@ -258,122 +291,509 @@ async def post_ksp_shipment_data(session: AsyncSession, data: KSPShipmentHeaders
     data.ship_details.clear()
 
     model_tools.update_model(
-        existing_shipment,
+        existing,
         data,
-        exclude={"cust_ref", "cust_po_no"},
+        exclude={
+            "cust_ref",
+            "cust_po_no",
+        },
     )
 
-    existing_details = {
-        detail.tracking_no: detail for detail in existing_shipment.ship_details
+    _merge_ksp_ship_details(
+        existing,
+        incoming_details,
+    )
+
+
+def _merge_ksp_ship_details(
+    existing: KSPShipmentHeaders,
+    incoming_details: list[KSPShipmentDetails],
+) -> None:
+
+    existing_by_tracking = {
+        detail.tracking_no: detail for detail in existing.ship_details
     }
 
-    for incoming_detail in incoming_details:
-        incoming_items = list(incoming_detail.items)
-        incoming_detail.items.clear()
+    for incoming in incoming_details:
+        incoming_items = list(incoming.items)
+        incoming.items.clear()
 
-        existing_detail = existing_details.get(incoming_detail.tracking_no)
+        current = existing_by_tracking.get(incoming.tracking_no)
 
-        if existing_detail is None:
-            incoming_detail.items.extend(incoming_items)
-            existing_shipment.ship_details.append(incoming_detail)
-            existing_details[incoming_detail.tracking_no] = incoming_detail
+        if current is None:
+            incoming.items.extend(incoming_items)
+            existing.ship_details.append(incoming)
+
+            existing_by_tracking[incoming.tracking_no] = incoming
+
             continue
 
         model_tools.update_model(
-            existing_detail,
-            incoming_detail,
-            exclude={"tracking_no", "cust_ref"},
+            current,
+            incoming,
+            exclude={"tracking_no"},
         )
 
-        existing_items = {item.item: item for item in existing_detail.items}
-
-        for incoming_item in incoming_items:
-            existing_item = existing_items.get(incoming_item.item)
-
-            if existing_item is None:
-                existing_detail.items.append(incoming_item)
-                existing_items[incoming_item.item] = incoming_item
-                continue
-
-            model_tools.update_model(
-                existing_item,
-                incoming_item,
-                exclude={"item", "tracking_no"},
-            )
+        model_tools.merge_model_collection(
+            current.items,
+            incoming_items,
+            key=lambda item: item.item,
+            exclude={"item"},
+        )
 
 
-class ShipmentPayloadMapper:
+async def post_productiv_shipment_data(
+    session: AsyncSession,
+    data: ProductivShipmentHeaders,
+) -> None:
 
-    def map_ksp_shipment(self, data: dict[str, Any]) -> KSPShipmentHeaders:
+    stmt = (
+        select(ProductivShipmentHeaders)
+        .where(ProductivShipmentHeaders.order_id == data.order_id)
+        .options(
+            selectinload(ProductivShipmentHeaders.items),
+            selectinload(ProductivShipmentHeaders.packages).selectinload(
+                ProductivShipmentPackages.contents
+            ),
+            selectinload(ProductivShipmentHeaders.billing_charges).selectinload(
+                ProductivShipmentBillingCharges.details
+            ),
+        )
+    )
 
-        ksp_shipment = KSPShipmentHeaders(
+    existing = await session.scalar(stmt)
+
+    if existing is None:
+        session.add(data)
+        return
+
+    incoming_items = list(data.items)
+    incoming_packages = list(data.packages)
+    incoming_charges = list(data.billing_charges)
+
+    data.items.clear()
+    data.packages.clear()
+    data.billing_charges.clear()
+
+    model_tools.update_model(
+        existing,
+        data,
+        exclude={"order_id"},
+    )
+
+    model_tools.merge_model_collection(
+        existing.items,
+        incoming_items,
+        key=lambda item: item.order_item_id,
+        exclude={"order_item_id"},
+    )
+
+    _merge_productiv_packages(
+        existing,
+        incoming_packages,
+    )
+
+    _merge_productiv_billing(
+        existing,
+        incoming_charges,
+    )
+
+
+def _merge_productiv_packages(
+    existing: ProductivShipmentHeaders,
+    incoming_packages: list[ProductivShipmentPackages],
+) -> None:
+
+    existing_by_package_id = {
+        package.productiv_package_id: package for package in existing.packages
+    }
+
+    for incoming in incoming_packages:
+        incoming_contents = list(incoming.contents)
+        incoming.contents.clear()
+
+        current = existing_by_package_id.get(incoming.productiv_package_id)
+
+        if current is None:
+            incoming.contents.extend(incoming_contents)
+            existing.packages.append(incoming)
+
+            existing_by_package_id[incoming.productiv_package_id] = incoming
+
+            continue
+
+        model_tools.update_model(
+            current,
+            incoming,
+            exclude={"productiv_package_id"},
+        )
+
+        model_tools.merge_model_collection(
+            current.contents,
+            incoming_contents,
+            key=lambda content: (content.productiv_package_content_id),
+            exclude={
+                "productiv_package_content_id",
+            },
+        )
+
+
+def _merge_productiv_billing(
+    existing: ProductivShipmentHeaders,
+    incoming_charges: list[ProductivShipmentBillingCharges],
+) -> None:
+
+    existing_by_sequence = {
+        charge.sequence: charge for charge in existing.billing_charges
+    }
+
+    for incoming in incoming_charges:
+        incoming_details = list(incoming.details)
+        incoming.details.clear()
+
+        current = existing_by_sequence.get(incoming.sequence)
+
+        if current is None:
+            incoming.details.extend(incoming_details)
+            existing.billing_charges.append(incoming)
+
+            existing_by_sequence[incoming.sequence] = incoming
+
+            continue
+
+        model_tools.update_model(
+            current,
+            incoming,
+            exclude={"sequence"},
+        )
+
+        model_tools.merge_model_collection(
+            current.details,
+            incoming_details,
+            key=lambda detail: (detail.warehouse_transaction_price_calc_id),
+            exclude={
+                "warehouse_transaction_price_calc_id",
+            },
+        )
+
+
+class KSPShipmentMapper:
+
+    @classmethod
+    def map_shipment(
+        cls,
+        data: dict[str, Any],
+    ) -> KSPShipmentHeaders:
+
+        shipment = KSPShipmentHeaders(
             cust_ref=as_str(data.get("cust_ref")),
             cust_po_no=as_str(data.get("cust_po_no")),
             delivered_to_wms_date=parse_dt(data.get("delivered_to_wms_date")),
             order_status=as_str(data.get("order_status")),
         )
 
-        ksp_shipment.ship_details = [
-            self.map_ksp_shipment_details(
-                detail,
-                cust_ref=ksp_shipment.cust_ref,
-            )
-            for detail in data.get("shipments") or []
+        shipment.ship_details = [
+            cls._map_detail(detail) for detail in data.get("shipments") or []
         ]
 
-        return ksp_shipment
+        return shipment
 
-    def map_ksp_shipment_details(
-        self,
+    @classmethod
+    def _map_detail(
+        cls,
         data: dict[str, Any],
-        *,
-        cust_ref: str,
     ) -> KSPShipmentDetails:
 
-        shipment_details = KSPShipmentDetails(
-            cust_ref=as_str(cust_ref),
+        detail = KSPShipmentDetails(
             carrier=as_str(data.get("carrier")),
             method=as_str(data.get("method")),
             tracking_no=as_str(data.get("tracking_no")),
-            tracking_no_secondary=as_str(data.get("tracking_no_secondary")),
-            total_cost=as_float(data.get("total_cost")),
             package_weight_lbs=as_float(data.get("package_weight_lbs")),
             dim_weight_lbs=as_float(data.get("dim_weight_lbs")),
-            zone=as_str(data.get("zone")),
-            delivery_surcharge_type=as_str(data.get("delivery_surcharge_type")),
             date=parse_dt(data.get("date")),
-            custom_1=data.get("custom_1"),
-            custom_2=data.get("custom_2"),
-            custom_3=data.get("custom_3"),
         )
 
-        shipment_details.items = [
-            self.map_ksp_shipment_detail_items(
-                item, tracking_no=shipment_details.tracking_no
-            )
-            for item in data.get("items") or []
-        ]
+        detail.items = [cls._map_detail_item(item) for item in data.get("items") or []]
 
-        return shipment_details
+        return detail
 
-    def map_ksp_shipment_detail_items(
-        self,
+    @staticmethod
+    def _map_detail_item(
         data: dict[str, Any],
-        *,
-        tracking_no: str,
     ) -> KSPShipmentDetailItems:
 
         return KSPShipmentDetailItems(
-            tracking_no=as_str(tracking_no),
             item=as_str(data.get("item")),
             quantity=as_int(data.get("quantity")),
-            carton_code=as_str(data.get("carton_code")),
-            carton_num=as_str(data.get("carton_num")),
-            box_length_in=as_str(data.get("box_length_in")),
-            box_width_in=as_str(data.get("box_width_in")),
-            box_height_in=as_str(data.get("box_height_in")),
-            package_weight_lbs=as_str(data.get("package_weight_lbs")),
-            lot_code=as_str(data.get("lot_code")),
-            serial_no=as_str(data.get("serial_no")),
-            custom_1=as_str(data.get("custom_1")),
+        )
+
+
+class ProductivShipmentMapper:
+
+    ITEM_REL = "http://api.3plCentral.com/rels/orders/item"
+
+    @classmethod
+    def map_shipment(
+        cls,
+        data: dict[str, Any],
+    ) -> ProductivShipmentHeaders:
+
+        body = cls._get_body(data)
+
+        shipment = cls._map_header(body)
+
+        shipment.items = cls._map_items(body)
+        shipment.packages = cls._map_packages(body)
+        shipment.billing_charges = cls._map_billing_charges(body)
+
+        return shipment
+
+    @staticmethod
+    def _get_body(
+        data: dict[str, Any],
+    ) -> dict[str, Any]:
+
+        resource = data.get("resource") or {}
+        body = resource.get("body")
+
+        if not isinstance(body, dict):
+            raise ValueError("Productiv OrderConfirm record missing resource.body")
+
+        return body
+
+    @classmethod
+    def _map_header(
+        cls,
+        body: dict[str, Any],
+    ) -> ProductivShipmentHeaders:
+
+        read_only = body.get("readOnly") or {}
+        routing = body.get("routingInfo") or {}
+        ship_to = body.get("shipTo") or {}
+        bill_to = body.get("billTo") or {}
+
+        customer = read_only.get("customerIdentifier") or {}
+        facility = read_only.get("facilityIdentifier") or {}
+        created_by = read_only.get("createdByIdentifier") or {}
+        modified_by = read_only.get("lastModifiedByIdentifier") or {}
+
+        unit_1 = body.get("unit1Identifier") or {}
+        unit_2 = body.get("unit2Identifier") or {}
+
+        return ProductivShipmentHeaders(
+            order_id=read_only["orderId"],
+            reference_num=body.get("referenceNum"),
+            po_num=body.get("poNum"),
+            external_id=body.get("externalId"),
+            fully_allocated=read_only.get("fullyAllocated"),
+            is_closed=read_only.get("isClosed"),
+            process_date=parse_dt(read_only.get("processDate")),
+            pick_started=read_only.get("pickStarted"),
+            pick_done_date=parse_dt(read_only.get("pickDoneDate")),
+            pick_ticket_print_date=parse_dt(read_only.get("pickTicketPrintDate")),
+            pack_started=read_only.get("packStarted"),
+            pack_done_date=parse_dt(read_only.get("packDoneDate")),
+            small_parcel_ship_date=parse_dt(read_only.get("smallParcelShipDate")),
+            parcel_label_type=read_only.get("parcelLabelType"),
+            ship_date=parse_dt(read_only.get("shipDate")),
+            customer_id=customer.get("id"),
+            customer_name=customer.get("name"),
+            facility_id=facility.get("id"),
+            facility_name=facility.get("name"),
+            creation_date=parse_dt(read_only.get("creationDate")),
+            created_by_id=created_by.get("id"),
+            created_by_name=created_by.get("name"),
+            last_modified_date=parse_dt(read_only.get("lastModifiedDate")),
+            last_modified_by_id=modified_by.get("id"),
+            last_modified_by_name=modified_by.get("name"),
+            status=read_only.get("status"),
+            charges_pending=read_only.get("chargesPending"),
+            earliest_ship_date=parse_dt(body.get("earliestShipDate")),
+            notes=body.get("notes"),
+            num_units_1=body.get("numUnits1"),
+            unit_1_name=unit_1.get("name"),
+            num_units_2=body.get("numUnits2"),
+            unit_2_name=unit_2.get("name"),
+            total_weight=as_decimal(body.get("totalWeight")),
+            total_volume=as_decimal(body.get("totalVolume")),
+            billing_code=body.get("billingCode"),
+            routing_scac_code=routing.get("scacCode"),
+            routing_carrier=routing.get("carrier"),
+            routing_mode=routing.get("mode"),
+            routing_account=routing.get("account"),
+            routing_ship_point_zip=routing.get("shipPointZip"),
+            routing_bill_of_lading=routing.get("billOfLading"),
+            routing_pickup_date=parse_dt(routing.get("pickupDate")),
+            routing_tracking_number=routing.get("trackingNumber"),
+            ship_to_contact_id=ship_to.get("contactId"),
+            ship_to_company_name=ship_to.get("companyName"),
+            ship_to_name=ship_to.get("name"),
+            ship_to_address_1=ship_to.get("address1"),
+            ship_to_address_2=ship_to.get("address2"),
+            ship_to_city=ship_to.get("city"),
+            ship_to_state=ship_to.get("state"),
+            ship_to_zip=ship_to.get("zip"),
+            ship_to_country=ship_to.get("country"),
+            ship_to_phone=ship_to.get("phoneNumber"),
+            ship_to_email=ship_to.get("emailAddress"),
+            ship_to_is_residential=ship_to.get("isAddressResidential"),
+            ship_to_address_status=ship_to.get("addressStatus"),
+            bill_to_contact_id=bill_to.get("contactId"),
+            bill_to_company_name=bill_to.get("companyName"),
+            bill_to_name=bill_to.get("name"),
+            bill_to_address_1=bill_to.get("address1"),
+            bill_to_address_2=bill_to.get("address2"),
+            bill_to_city=bill_to.get("city"),
+            bill_to_state=bill_to.get("state"),
+            bill_to_zip=bill_to.get("zip"),
+            bill_to_country=bill_to.get("country"),
+            bill_to_phone=bill_to.get("phoneNumber"),
+            bill_to_email=bill_to.get("emailAddress"),
+            bill_to_is_residential=bill_to.get("isAddressResidential"),
+            bill_to_address_status=bill_to.get("addressStatus"),
+            parcel_response=body.get("parcelResponse"),
+        )
+
+    @classmethod
+    def _map_items(
+        cls,
+        body: dict[str, Any],
+    ) -> list[ProductivShipmentItems]:
+
+        embedded = body.get("_embedded") or {}
+
+        return [cls._map_item(item) for item in embedded.get(cls.ITEM_REL) or []]
+
+    @staticmethod
+    def _map_item(
+        data: dict[str, Any],
+    ) -> ProductivShipmentItems:
+
+        read_only = data.get("readOnly") or {}
+        identifier = data.get("itemIdentifier") or {}
+        unit = read_only.get("unitIdentifier") or {}
+
+        return ProductivShipmentItems(
+            order_item_id=read_only["orderItemId"],
+            fully_allocated=read_only.get("fullyAllocated"),
+            unit_name=unit.get("name"),
+            original_primary_qty=as_decimal(read_only.get("originalPrimaryQty")),
+            row_version=read_only.get("rowVersion"),
+            productiv_item_id=identifier.get("id"),
+            sku=identifier.get("sku"),
+            external_id=data.get("externalId"),
+            qty=as_decimal(data.get("qty")),
+            weight_imperial=as_decimal(data.get("weightImperial")),
+            weight_metric=as_decimal(data.get("weightMetric")),
+            fulfill_inv_sale_price=as_decimal(data.get("fulfillInvSalePrice")),
+        )
+
+    @classmethod
+    def _map_packages(
+        cls,
+        body: dict[str, Any],
+    ) -> list[ProductivShipmentPackages]:
+
+        read_only = body.get("readOnly") or {}
+
+        return [
+            cls._map_package(package) for package in read_only.get("packages") or []
+        ]
+
+    @classmethod
+    def _map_package(
+        cls,
+        data: dict[str, Any],
+    ) -> ProductivShipmentPackages:
+
+        package = ProductivShipmentPackages(
+            productiv_package_id=data["packageId"],
+            package_type_id=data.get("packageTypeId"),
+            length=as_decimal(data.get("length")),
+            width=as_decimal(data.get("width")),
+            height=as_decimal(data.get("height")),
+            weight=as_decimal(data.get("weight")),
+            tracking_number=data.get("trackingNumber"),
+            create_date=parse_dt(data.get("createDate")),
+            oversize=data.get("oversize"),
+            ucc128=data.get("ucc128"),
+            carton_id=data.get("cartonId"),
+        )
+
+        package.contents = [
+            cls._map_package_content(content)
+            for content in data.get("packageContents") or []
+        ]
+
+        return package
+
+    @staticmethod
+    def _map_package_content(
+        data: dict[str, Any],
+    ) -> ProductivShipmentPackageContents:
+
+        identifier = data.get("itemIdentifier") or {}
+
+        return ProductivShipmentPackageContents(
+            productiv_package_content_id=data["packageContentId"],
+            productiv_package_id=data.get("packageId"),
+            productiv_order_item_id=data.get("orderItemId"),
+            productiv_receive_item_id=data.get("receiveItemId"),
+            qty=as_decimal(data.get("qty")),
+            create_date=parse_dt(data.get("createDate")),
+            productiv_item_id=identifier.get("id"),
+            sku=identifier.get("sku"),
+        )
+
+    @classmethod
+    def _map_billing_charges(
+        cls,
+        body: dict[str, Any],
+    ) -> list[ProductivShipmentBillingCharges]:
+
+        billing = body.get("billing") or {}
+
+        return [
+            cls._map_billing_charge(
+                charge,
+                sequence=sequence,
+            )
+            for sequence, charge in enumerate(billing.get("billingCharges") or [])
+        ]
+
+    @classmethod
+    def _map_billing_charge(
+        cls,
+        data: dict[str, Any],
+        *,
+        sequence: int,
+    ) -> ProductivShipmentBillingCharges:
+
+        charge = ProductivShipmentBillingCharges(
+            sequence=sequence,
+            charge_type=data.get("chargeType"),
+            subtotal=as_decimal(data.get("subtotal")),
+        )
+
+        charge.details = [
+            cls._map_billing_detail(detail) for detail in data.get("details") or []
+        ]
+
+        return charge
+
+    @staticmethod
+    def _map_billing_detail(
+        data: dict[str, Any],
+    ) -> ProductivShipmentBillingChargeDetails:
+
+        return ProductivShipmentBillingChargeDetails(
+            warehouse_transaction_price_calc_id=data.get(
+                "warehouseTransactionPriceCalcId"
+            ),
+            num_units=as_decimal(data.get("numUnits")),
+            charge_label=data.get("chargeLabel"),
+            unit_description=data.get("unitDescription"),
+            charge_per_unit=as_decimal(data.get("chargePerUnit")),
+            sku=data.get("sku"),
+            system_generated=data.get("systemGenerated"),
         )
