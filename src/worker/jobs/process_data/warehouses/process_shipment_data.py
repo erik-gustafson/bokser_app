@@ -27,7 +27,7 @@ from src.database.database import async_session
 logger = logging.getLogger(__name__)
 
 
-SHIPMENT_ENTITIES = [("ksp", "order_update"), ("productiv", "OrderConfirm")]
+SHIPMENT_ENTITIES = [("ksp", "order_update"), ("productiv", "orderconfirm")]
 
 ### local dev begin ###
 

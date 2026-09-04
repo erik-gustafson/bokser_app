@@ -6,6 +6,8 @@ from src.integrations._base_client.token_cache import token_store
 
 from src.worker.jobs.get_data.base_get import sync_endpoints_job
 
+from src.worker.jobs.get_data.gmail.get_gmail_data import GmailTasks
+
 from src.storage.raw.writer import RawPayloadWriter
 from src.storage.states.state_store import warmup_state_files
 
@@ -15,6 +17,10 @@ from src.worker.jobs.get_data.get_sos_data import GetSosData
 from src.worker.jobs.push_data.push_to_sos import AcendaOrderPush
 from src.worker.jobs.process_data.warehouses.process_shipment_data import (
     shipment_load_to_db,
+)
+
+from src.worker.jobs.process_data.sutton.process_sutton_reporting import (
+    SuttonReportTasks,
 )
 
 LAKE_ROOT = settings.lake_root
@@ -43,7 +49,18 @@ async def acenda_main() -> None:
     )
 
 
+async def get_gmail_data() -> None:
+
+    gmail_tasks = GmailTasks()
+    sutton_tasks = SuttonReportTasks()
+
+    await gmail_tasks.sutton_report_download(raw_writer=RawPayloadWriter(LAKE_ROOT))
+    await sutton_tasks.process_sutton_reports()
+
+
 if __name__ == "__main__":
+
+    asyncio.run(get_gmail_data())
 
     asyncio.run(shipment_load_to_db(limit=150))
 

@@ -48,10 +48,13 @@ services:
     stop_grace_period: 30s
     env_file:
       - .env
-    volumes:
-      - ${LAKE_HOST_PATH}:${LAKE_ROOT}:rw
-      - ${DOWNLOADS_HOST_PATH}:${DOWNLOADS_ROOT}:rw
-      - ${REPORTING_ARCHIVE_HOST_PATH}:${REPORTING_ARCHIVE_ROOT}:rw
+  volumes:
+    - ${LAKE_HOST_PATH}:${LAKE_ROOT}:rw
+    - ${DOWNLOADS_HOST_PATH}:${DOWNLOADS_ROOT}:rw
+    - ${REPORTING_ARCHIVE_HOST_PATH}:${REPORTING_ARCHIVE_ROOT}:rw
+
+    - ${GMAIL_CREDENTIALS_HOST_PATH}:${GMAIL_CREDENTIALS_PATH}:ro
+    - ${GMAIL_TOKEN_HOST_PATH}:${GMAIL_TOKEN_PATH}:rw
 
 networks:
   db_net:

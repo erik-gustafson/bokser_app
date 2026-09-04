@@ -79,8 +79,12 @@ async def claim_lake_files(
 
 
 def extract_json_records(
-    payload: Any, *, path: Path, expected_entity_name: str | None = None
+    payload: Any,
+    *,
+    path: Path,
+    expected_entity_name: str | None = None,
 ) -> list[dict[str, Any]]:
+
     if not isinstance(payload, dict):
         raise ValueError(f"Expected wrapped lake JSON object in {path}")
 
@@ -93,17 +97,48 @@ def extract_json_records(
     if expected_entity_name and metadata.get("entity_name") != expected_entity_name:
         raise ValueError(
             f"Entity mismatch in {path}: "
-            f"manifest={expected_entity_name}, file={metadata.get('entity_name')}"
+            f"manifest={expected_entity_name}, "
+            f"file={metadata.get('entity_name')}"
         )
 
-    if not isinstance(records, list):
-        if isinstance(records, dict):
-            record_list: list[dict[str, Any]] = records["orders"]
-            return record_list
-        else:
-            raise ValueError(f"Expected payload list in {path}")
+    record_list = _normalize_json_records(
+        records,
+        path=path,
+    )
 
-    if any(not isinstance(record, dict) for record in records):
+    if any(not isinstance(record, dict) for record in record_list):
         raise ValueError(f"Payload contains non-object records in {path}")
 
-    return records
+    expected_count = metadata.get("record_count")
+
+    if isinstance(expected_count, int) and expected_count != len(record_list):
+        raise ValueError(
+            f"Record count mismatch in {path}: "
+            f"metadata={expected_count}, "
+            f"actual={len(record_list)}"
+        )
+
+    return record_list
+
+
+def _normalize_json_records(
+    records: Any,
+    *,
+    path: Path,
+) -> list[dict[str, Any]]:
+
+    if isinstance(records, list):
+        return records
+
+    if not isinstance(records, dict):
+        raise ValueError(f"Expected payload object or list in {path}")
+
+    orders = records.get("orders")
+
+    if orders is not None:
+        if not isinstance(orders, list):
+            raise ValueError(f"Expected payload.orders list in {path}")
+
+        return orders
+
+    return [records]

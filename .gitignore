@@ -7,3 +7,7 @@ downloads/
 data_lake/
 reporting_archive/
 *.log
+
+secrets/
+gmail_credentials.json
+gmail_token.pickle

@@ -50,6 +50,7 @@ def build_runtime(http_client: httpx.AsyncClient) -> WorkerRuntime:
 def register_jobs(
     scheduler: AsyncIOScheduler, runtime: WorkerRuntime, logger: logging.Logger
 ) -> None:
+
     scheduler.add_job(
         sos_load_to_db,
         "interval",
@@ -57,11 +58,6 @@ def register_jobs(
         id="load_sos_lake_files_to_db",
         max_instances=1,
         coalesce=True,
-    )
-
-    logger.info(
-        "SOS Load Lake Worker started sucessfully, polling every %s minutes",
-        settings.sos_lake_load_interval_minutes,
     )
 
     scheduler.add_job(
@@ -76,11 +72,6 @@ def register_jobs(
         max_instances=1,
         coalesce=True,
         misfire_grace_time=60,
-    )
-
-    logger.info(
-        "SOS Sync Worker started sucessfully, polling every %s minutes",
-        settings.sos_poll_interval_minutes,
     )
 
     scheduler.add_job(
@@ -106,16 +97,6 @@ def register_jobs(
         coalesce=True,
     )
 
-    logger.info(
-        "Acenda Sync Worker started sucessfully, polling every %s minutes",
-        settings.acenda_poll_interval_minutes,
-    )
-
-    logger.info(
-        "Acenda Load Lake Worker started sucessfully, polling every %s minutes",
-        settings.acenda_lake_load_interval_minutes,
-    )
-
 
 def build_scheduler() -> AsyncIOScheduler:
     return AsyncIOScheduler(timezone="UTC")
@@ -138,6 +119,15 @@ async def run_worker() -> None:
         scheduler.start()
 
         logger.info("Worker started sucessfully")
+        logger.info("=" * 60)
+        logger.info("SCHEDULED JOBS:")
+        logger.info("=" * 60)
+        for job in scheduler.get_jobs():
+            logger.info(f"  • {job.name}")
+            logger.info(f"    ID: {job.id}")
+            logger.info(f"    Next run: {job.next_run_time}")
+            logger.info(f"    Trigger: {job.trigger}")
+            logger.info("-" * 60)
 
         loop = asyncio.get_running_loop()
         for sig in (signal.SIGINT, signal.SIGTERM):
