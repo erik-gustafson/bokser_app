@@ -48,10 +48,10 @@ class KSPShipmentHeaders(Base):
                     **_json_safe_column_dict(detail),
                     "items": [
                         _json_safe_column_dict(item)
-                        for item in sorted(detail.items, key=lambda x: x.id)
+                        for item in sorted(detail.items, key=lambda x: x.item)
                     ],
                 }
-                for detail in sorted(self.ship_details, key=lambda x: x.id)
+                for detail in sorted(self.ship_details, key=lambda x: x.tracking_no)
             ],
         }
 
