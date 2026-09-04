@@ -3,6 +3,9 @@ from __future__ import annotations
 import logging
 import os
 
+import hashlib
+import json
+
 from collections import defaultdict
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -12,6 +15,7 @@ import pandas as pd
 
 from dateutil import parser
 
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.inspection import inspect
 from sqlalchemy.orm import Session
 
@@ -925,6 +929,8 @@ class SuttonReportProcessor:
                     db=db,
                 )
 
+                self.post_sales_report_to_sos_ship_sync(db=db, df=report_df)
+
             # ----------------------------------------------------------
             # EDI Load
             # ----------------------------------------------------------
@@ -989,6 +995,55 @@ class SuttonReportProcessor:
 
         finally:
             db.close()
+
+    def post_sales_report_to_sos_ship_sync(
+        self,
+        db: Session,
+        df: pd.DataFrame,
+    ) -> None:
+
+        sales_report_invs = df["column_name"].dropna().unique().tolist()
+
+        for inv in sales_report_invs:
+
+            records = (
+                df.loc[df["column_name"] == inv]
+                .sort_values(["style"])  # or another stable unique column
+                .to_dict(orient="records")
+            )
+
+            serialized = json.dumps(
+                records,
+                sort_keys=True,
+                separators=(",", ":"),
+                default=str,
+            )
+
+            payload_hash = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+            stmt = (
+                insert(SosShipmentSync)
+                .values(
+                    source="sutton",
+                    source_id=int(inv),
+                    status="pending",
+                    payload_hash=payload_hash,
+                )
+                .on_conflict_do_update(
+                    index_elements=[
+                        SosShipmentSync.source,
+                        SosShipmentSync.source_id,
+                        SosShipmentSync.payload_hash,
+                    ],
+                    set_={
+                        "status": "pending",
+                    },
+                )
+            )
+
+            db.execute(stmt)
+
+        db.commit()
 
     # ==================================================================
     # Excel Reader

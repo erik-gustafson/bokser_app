@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime
-
+from typing import Any
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.database import Base
+from src.database.utils.model_tools import _json_safe_column_dict
 
 WAREHOUSE_SCHEMA = "warehouse_data"
 
@@ -38,6 +39,21 @@ class KSPShipmentHeaders(Base):
         back_populates="ship_headers",
         cascade="all, delete-orphan",
     )
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            **_json_safe_column_dict(self),
+            "ship_details": [
+                {
+                    **_json_safe_column_dict(detail),
+                    "items": [
+                        _json_safe_column_dict(item)
+                        for item in sorted(detail.items, key=lambda x: x.id)
+                    ],
+                }
+                for detail in sorted(self.ship_details, key=lambda x: x.id)
+            ],
+        }
 
 
 class KSPShipmentDetails(Base):

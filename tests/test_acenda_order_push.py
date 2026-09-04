@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.worker.jobs.push_data.push_to_sos import AcendaOrderPush
+from src.worker.jobs.push_data.sos.push_to_sos import AcendaOrderPush
 
 
 class _TransactionContext:
@@ -56,15 +56,11 @@ class AcendaOrderPushTests(unittest.IsolatedAsyncioTestCase):
             events.append("order_posted")
             return True, None
 
-        push.sos_so_sync._upsert_sync_rows = AsyncMock(
-            side_effect=upsert_sync_rows
-        )
+        push.sos_so_sync._upsert_sync_rows = AsyncMock(side_effect=upsert_sync_rows)
         push.load_open_acenda_db_orders = AsyncMock(return_value=[MagicMock()])
         push._get_order_skus = MagicMock(return_value=())
         push._map_orders = MagicMock(return_value=([order], []))
-        push._post_to_sos_and_log = AsyncMock(
-            side_effect=post_to_sos_and_log
-        )
+        push._post_to_sos_and_log = AsyncMock(side_effect=post_to_sos_and_log)
 
         with patch(
             "src.worker.jobs.push_data.push_to_sos.async_session",
@@ -73,9 +69,7 @@ class AcendaOrderPushTests(unittest.IsolatedAsyncioTestCase):
             await push.send_to_sos()
 
         push.sos_so_sync._upsert_sync_rows.assert_awaited_once()
-        push._post_to_sos_and_log.assert_awaited_once_with(
-            mapped_order=order
-        )
+        push._post_to_sos_and_log.assert_awaited_once_with(mapped_order=order)
         self.assertLess(
             events.index("transaction_committed"),
             events.index("order_posted"),

@@ -7,25 +7,9 @@ from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from src.database.database import Base
+from src.database.utils.model_tools import _json_safe_column_dict
 
 ACENDA_SCHEMA = "acenda"
-
-
-def _json_safe(value: Any) -> Any:
-    if isinstance(value, (datetime, date)):
-        return value.isoformat()
-    if isinstance(value, dict):
-        return {str(key): _json_safe(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_json_safe(item) for item in value]
-    return value
-
-
-def _json_safe_column_dict(model: Any) -> dict[str, Any]:
-    return {
-        column.name: _json_safe(getattr(model, column.name))
-        for column in model.__table__.columns
-    }
 
 
 class AcendaOrderHeaders(Base):

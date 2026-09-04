@@ -18,6 +18,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.database import Base
+from src.database.utils.model_tools import _json_safe_column_dict
 
 WAREHOUSE_SCHEMA = "warehouse_data"
 
@@ -203,6 +204,35 @@ class ProductivShipmentHeaders(Base):
         back_populates="header",
         cascade="all, delete-orphan",
     )
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            **_json_safe_column_dict(self),
+            "items": [
+                _json_safe_column_dict(item)
+                for item in sorted(self.items, key=lambda x: x.id)
+            ],
+            "packages": [
+                {
+                    **_json_safe_column_dict(package),
+                    "items": [
+                        _json_safe_column_dict(content)
+                        for content in sorted(package.contents, key=lambda x: x.id)
+                    ],
+                }
+                for package in sorted(self.packages, key=lambda x: x.id)
+            ],
+            "billing_charges": [
+                {
+                    **_json_safe_column_dict(charge),
+                    "items": [
+                        _json_safe_column_dict(details)
+                        for details in sorted(charge.details, key=lambda x: x.id)
+                    ],
+                }
+                for charge in sorted(self.billing_charges, key=lambda x: x.id)
+            ],
+        }
 
 
 class ProductivShipmentItems(Base):

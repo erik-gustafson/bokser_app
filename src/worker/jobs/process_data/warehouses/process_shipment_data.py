@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import hashlib
+
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -9,6 +11,7 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import insert
 
 from src.worker.jobs.process_data.utils import data_lake_tools
 
@@ -218,6 +221,13 @@ async def load_shipment_records(
                         shipment,
                     )
 
+                    await add_to_shipment_sync(
+                        session=session,
+                        source=warehouse,
+                        source_id=as_int(record_id),
+                        payload=shipment.to_json(),
+                    )
+
             elif warehouse == "productiv":
                 body = raw_record.get("resource", {}).get("body", {})
 
@@ -235,6 +245,13 @@ async def load_shipment_records(
                     await post_productiv_shipment_data(
                         session,
                         shipment,
+                    )
+
+                    await add_to_shipment_sync(
+                        session=session,
+                        source=warehouse,
+                        source_id=as_int(record_id),
+                        payload=shipment.to_json(),
                     )
 
             else:
@@ -261,6 +278,45 @@ async def load_shipment_records(
         "skipped": skipped,
         "failed": failed,
     }
+
+
+async def add_to_shipment_sync(
+    session: AsyncSession, source: str, source_id: int, payload: dict
+):
+
+    def hash_payload(payload: dict) -> str:
+        encoded = json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        ).encode("utf-8")
+
+        return hashlib.sha256(encoded).hexdigest()
+
+    payload_hash = hash_payload(payload)
+
+    stmt = (
+        insert(SosShipmentSync)
+        .values(
+            source=source,
+            source_id=as_int(source_id),
+            status="pending",
+            payload_hash=payload_hash,
+        )
+        .on_conflict_do_update(
+            index_elements=[
+                SosShipmentSync.source,
+                SosShipmentSync.source_id,
+                SosShipmentSync.payload_hash,
+            ],
+            set_={
+                "status": "resent",
+            },
+        )
+    )
+
+    await session.execute(stmt)
 
 
 async def post_ksp_shipment_data(

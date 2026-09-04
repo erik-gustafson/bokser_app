@@ -14,7 +14,7 @@ from src.storage.states.state_store import warmup_state_files
 from src.worker.jobs.get_data.get_acenda_data import GetAcendaData
 from src.worker.jobs.get_data.get_sos_data import GetSosData
 
-from src.worker.jobs.push_data.push_to_sos import AcendaOrderPush
+from src.worker.jobs.push_data.sos.push_to_sos import AcendaOrderPush
 from src.worker.jobs.process_data.warehouses.process_shipment_data import (
     shipment_load_to_db,
 )
