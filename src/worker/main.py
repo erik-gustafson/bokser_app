@@ -23,6 +23,9 @@ from src.worker.jobs.get_data.gmail.get_gmail_data import gmail_tasks
 from src.worker.jobs.process_data.sutton.process_sutton_reporting import (
     sutton_report_tasks,
 )
+from src.worker.jobs.process_data.warehouses.process_shipment_data import (
+    shipment_load_to_db,
+)
 from src.worker.jobs.process_data.acenda.process_acenda_data import acenda_load_to_db
 from src.worker.jobs.process_data.sos.process_sos_data import sos_load_to_db
 from src.storage.states.state_store import warmup_state_files
@@ -114,6 +117,15 @@ def register_jobs(scheduler: AsyncIOScheduler, runtime: WorkerRuntime) -> None:
         "interval",
         minutes=5,
         id="load_sutton_lake_files_to_db",
+        max_instances=1,
+        coalesce=True,
+    )
+
+    scheduler.add_job(
+        shipment_load_to_db,
+        "interval",
+        minutes=5,
+        id="load_warehouse_lake_files_to_db",
         max_instances=1,
         coalesce=True,
     )
