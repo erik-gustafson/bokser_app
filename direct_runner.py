@@ -18,6 +18,7 @@ from src.worker.jobs.push_data.sos.push_to_sos import AcendaOrderPush
 from src.worker.jobs.process_data.warehouses.process_shipment_data import (
     shipment_load_to_db,
 )
+from src.worker.jobs.push_data.sos.sos_shipment_sync import SosShipmentSyncTasks
 
 from src.worker.jobs.process_data.sutton.process_sutton_reporting import (
     SuttonReportTasks,
@@ -58,7 +59,16 @@ async def get_gmail_data() -> None:
     await sutton_tasks.process_sutton_reports()
 
 
+async def load_ship_sync_table():
+
+    ship_tasks = SosShipmentSyncTasks()
+
+    await ship_tasks.direct_load_to_sync_table()
+
+
 if __name__ == "__main__":
+
+    asyncio.run(load_ship_sync_table())
 
     asyncio.run(get_gmail_data())
 

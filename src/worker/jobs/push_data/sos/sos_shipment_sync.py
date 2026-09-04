@@ -18,11 +18,12 @@ import logging
 
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select, func, cast, Text, BigInteger, or_
+from sqlalchemy import exists, literal, select, or_
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.database import async_session
-
+from src.database.models import *
 
 from src.database.models.sos_models import SosShipmentSync
 
@@ -56,3 +57,46 @@ class SosShipmentSyncTasks:
             result = await session.scalars(stmt)
 
             return list(result.all())
+
+    async def direct_load_to_sync_table(self) -> None:
+
+        async with async_session() as session:
+            sources = [
+                ("sutton", SuttonSalesReport),
+                ("ksp", KSPShipmentHeaders),
+                ("productiv", ProductivShipmentHeaders),
+            ]
+
+            for source_name, model in sources:
+
+                if source_name == "sutton":
+                    source_id = model.invoice
+                else:
+                    source_id = model.id
+
+                source_rows = select(
+                    literal(source_name),
+                    source_id,
+                ).where(
+                    ~exists(
+                        select(1).where(
+                            SosShipmentSync.source == source_name,
+                            SosShipmentSync.source_id == source_id,
+                        )
+                    )
+                )
+
+                stmt = (
+                    insert(SosShipmentSync)
+                    .from_select(
+                        ["source", "source_id"],
+                        source_rows,
+                    )
+                    .on_conflict_do_nothing(
+                        constraint="ux_sos_shipment_sync_source_key"
+                    )
+                )
+
+                await session.execute(stmt)
+
+            await session.commit()

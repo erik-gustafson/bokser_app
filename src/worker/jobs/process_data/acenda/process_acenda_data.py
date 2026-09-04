@@ -215,19 +215,19 @@ async def load_acenda_records(
         record_id = raw_record.get("id")
 
         try:
-            if payload_type == "order":
+            if payload_type == "acenda_orders":
                 data = mapper.map_acenda_order(data=raw_record)
                 model = AcendaOrderHeaders
 
-            elif payload_type == "ship_advice":
+            elif payload_type == "acenda_ship_advices":
                 data = mapper.map_ship_advice_header(data=raw_record)
                 model = AcendaShipAdviceHeaders
 
-            elif payload_type == "fulfillment":
+            elif payload_type == "acenda_fulfillments":
                 data = mapper.map_acenda_fulfillment(data=raw_record)
                 model = AcendaFulfillments
 
-            elif payload_type == "return":
+            elif payload_type == "acenda_returns":
                 data = mapper.map_acenda_return(data=raw_record)
                 model = AcendaOrderReturns
 
