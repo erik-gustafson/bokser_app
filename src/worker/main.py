@@ -19,6 +19,10 @@ from src.storage.raw.writer import RawPayloadWriter
 from src.worker.jobs.get_data.get_sos_data import GetSosData
 from src.worker.jobs.get_data.get_acenda_data import GetAcendaData
 from src.worker.jobs.get_data.base_get import sync_endpoints_job
+from src.worker.jobs.get_data.gmail.get_gmail_data import gmail_tasks
+from src.worker.jobs.process_data.sutton.process_sutton_reporting import (
+    sutton_report_tasks,
+)
 from src.worker.jobs.process_data.acenda.process_acenda_data import acenda_load_to_db
 from src.worker.jobs.process_data.sos.process_sos_data import sos_load_to_db
 from src.storage.states.state_store import warmup_state_files
@@ -47,9 +51,7 @@ def build_runtime(http_client: httpx.AsyncClient) -> WorkerRuntime:
     )
 
 
-def register_jobs(
-    scheduler: AsyncIOScheduler, runtime: WorkerRuntime, logger: logging.Logger
-) -> None:
+def register_jobs(scheduler: AsyncIOScheduler, runtime: WorkerRuntime) -> None:
 
     scheduler.add_job(
         sos_load_to_db,
@@ -97,6 +99,24 @@ def register_jobs(
         coalesce=True,
     )
 
+    scheduler.add_job(
+        gmail_tasks.sutton_report_download,
+        "interval",
+        minutes=1,
+        id="download_sutton_reports",
+        max_instances=1,
+        coalesce=True,
+    )
+
+    scheduler.add_job(
+        sutton_report_tasks.process_sutton_reports,
+        "interval",
+        minutes=1,
+        id="load_sutton_lake_files_to_db",
+        max_instances=1,
+        coalesce=True,
+    )
+
 
 def build_scheduler() -> AsyncIOScheduler:
     return AsyncIOScheduler(timezone="UTC")
@@ -115,7 +135,7 @@ async def run_worker() -> None:
     async with build_http_client() as http_client:
         runtime = build_runtime(http_client)
         scheduler = build_scheduler()
-        register_jobs(scheduler, runtime, logger)
+        register_jobs(scheduler, runtime)
         scheduler.start()
 
         logger.info("Worker started sucessfully")

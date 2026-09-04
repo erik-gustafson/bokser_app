@@ -1533,3 +1533,6 @@ class SuttonReportProcessor:
                 ) from exc
 
         return mapped_data
+
+
+sutton_report_tasks = SuttonReportTasks()

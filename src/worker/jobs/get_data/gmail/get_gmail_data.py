@@ -83,3 +83,6 @@ class GmailTasks:
     #             f"Fatal error in Guest Supply PO processing task: {e}", exc_info=True
     #         )
     #         raise
+
+
+gmail_tasks = GmailTasks()
