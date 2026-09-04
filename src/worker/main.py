@@ -100,11 +100,10 @@ def register_jobs(scheduler: AsyncIOScheduler, runtime: WorkerRuntime) -> None:
     )
 
     scheduler.add_job(
-        gmail_tasks.sutton_report_download(
-            raw_writer=RawPayloadWriter(settings.lake_root)
-        ),
+        gmail_tasks.sutton_report_download,
         "interval",
         minutes=1,
+        kwargs={"raw_writer": runtime.raw_writer},
         id="download_sutton_reports",
         max_instances=1,
         coalesce=True,
