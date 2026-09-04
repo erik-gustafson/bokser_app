@@ -224,7 +224,7 @@ async def load_shipment_records(
                     await add_to_shipment_sync(
                         session=session,
                         source=warehouse,
-                        source_id=as_int(record_id),
+                        source_id=str(record_id),
                         payload=shipment.to_json(),
                     )
 
@@ -250,7 +250,7 @@ async def load_shipment_records(
                     await add_to_shipment_sync(
                         session=session,
                         source=warehouse,
-                        source_id=as_int(record_id),
+                        source_id=str(record_id),
                         payload=shipment.to_json(),
                     )
 
@@ -281,7 +281,7 @@ async def load_shipment_records(
 
 
 async def add_to_shipment_sync(
-    session: AsyncSession, source: str, source_id: int, payload: dict
+    session: AsyncSession, source: str, source_id: str, payload: dict
 ):
 
     def hash_payload(payload: dict) -> str:

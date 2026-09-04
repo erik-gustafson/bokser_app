@@ -2512,7 +2512,10 @@ class SosShipmentSync(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     source: Mapped[str] = mapped_column(String(64), nullable=False)
-    source_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_id: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+    )
 
     payload_hash: Mapped[str | None] = mapped_column(String(255))
 

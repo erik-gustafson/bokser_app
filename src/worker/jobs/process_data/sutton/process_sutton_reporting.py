@@ -1025,7 +1025,7 @@ class SuttonReportProcessor:
                 insert(SosShipmentSync)
                 .values(
                     source="sutton",
-                    source_id=int(inv),
+                    source_id=str(inv),
                     status="pending",
                     payload_hash=payload_hash,
                 )

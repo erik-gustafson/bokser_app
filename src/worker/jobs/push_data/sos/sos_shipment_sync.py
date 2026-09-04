@@ -18,7 +18,7 @@ import logging
 
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import exists, literal, select, or_
+from sqlalchemy import String, cast, exists, literal, select, or_
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -73,17 +73,21 @@ class SosShipmentSyncTasks:
 
                 if source_name == "sutton":
                     source_id = model.invoice
+                elif source_name == "ksp":
+                    source_id = model.cust_ref
                 else:
-                    source_id = model.id
+                    source_id = model.order_id
+
+                source_id_as_string = cast(source_id, String(128))
 
                 source_rows = select(
                     literal(source_name),
-                    source_id,
+                    source_id_as_string,
                 ).where(
                     ~exists(
                         select(1).where(
                             SosShipmentSync.source == source_name,
-                            SosShipmentSync.source_id == source_id,
+                            SosShipmentSync.source_id == source_id_as_string,
                         )
                     )
                 )
