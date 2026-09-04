@@ -311,7 +311,7 @@ async def add_to_shipment_sync(
                 SosShipmentSync.payload_hash,
             ],
             set_={
-                "status": "resent",
+                "status": "pending",
             },
         )
     )
