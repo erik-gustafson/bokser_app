@@ -35,17 +35,17 @@ SHIPMENT_ENTITIES = [("ksp", "order_update"), ("productiv", "orderconfirm")]
 ### local dev begin ###
 
 
-def resolve_lake_path(file_path: str) -> Path:
-    container_root = Path("/app/data_lake")
-    local_root = Path(r"X:\data_lake\prod")
+# def resolve_lake_path(file_path: str) -> Path:
+#     container_root = Path("/app/data_lake")
+#     local_root = Path(r"X:\data_lake\prod")
 
-    path = Path(file_path)
+#     path = Path(file_path)
 
-    if str(path).startswith(str(container_root)):
-        relative_path = path.relative_to(container_root)
-        return local_root / relative_path
+#     if str(path).startswith(str(container_root)):
+#         relative_path = path.relative_to(container_root)
+#         return local_root / relative_path
 
-    return path
+#     return path
 
 
 ### local dev end ###
@@ -89,9 +89,9 @@ async def load_whse_shipment_lake_files(
     # Step 2: process each claimed file independently.
     for lake_file in claimed_files:
         try:
-            # path = Path(lake_file.file_path)
+            path = Path(lake_file.file_path)
 
-            path = resolve_lake_path(lake_file.file_path)
+            # path = resolve_lake_path(lake_file.file_path)
 
             with path.open("r", encoding="utf-8") as f:
                 file_data = json.load(f)
