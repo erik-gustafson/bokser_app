@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.database import async_session
 from src.database.models import *
 
-from src.database.models.sos_models import SosShipmentSync
+from src.integrations.sos_client import SOSClient
 
 logger = logging.getLogger(__name__)
 
@@ -33,11 +33,13 @@ logger = logging.getLogger(__name__)
 class SosShipmentSyncTasks:
 
     def __init__(self):
-        pass
+        self.sos_client = SOSClient()
 
     async def process_shipment_sync(self):
 
         shipments_to_sync = await self.get_shipments_to_sync()
+
+        self.sos_client.get()
 
     async def get_shipments_to_sync(
         self,

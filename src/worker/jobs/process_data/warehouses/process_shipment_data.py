@@ -300,18 +300,15 @@ async def add_to_shipment_sync(
         insert(SosShipmentSync)
         .values(
             source=source,
-            source_id=as_int(source_id),
-            status="pending",
+            source_id=source_id,
             payload_hash=payload_hash,
+            status="pending",
         )
         .on_conflict_do_update(
-            index_elements=[
-                SosShipmentSync.source,
-                SosShipmentSync.source_id,
-                SosShipmentSync.payload_hash,
-            ],
+            constraint="ux_sos_shipment_sync_source_key",
             set_={
                 "status": "pending",
+                "payload_hash": payload_hash,
             },
         )
     )

@@ -1030,11 +1030,7 @@ class SuttonReportProcessor:
                     payload_hash=payload_hash,
                 )
                 .on_conflict_do_update(
-                    index_elements=[
-                        SosShipmentSync.source,
-                        SosShipmentSync.source_id,
-                        SosShipmentSync.payload_hash,
-                    ],
+                    constraint="ux_sos_shipment_sync_source_key",
                     set_={
                         "status": "pending",
                     },
