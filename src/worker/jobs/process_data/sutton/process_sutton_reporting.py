@@ -190,8 +190,9 @@ class SuttonReportManager:
         if report_type == "INVENAVL":
             sheet_name = "INVEN"
 
-        elif report_type == "EDILDT":
-            sheet_names = pd.ExcelFile(report).sheet_names
+        elif report_type in {"EDILDT", "edi"}:
+            with pd.ExcelFile(report) as workbook:
+                sheet_names = workbook.sheet_names
 
             if len(sheet_names) < 2:
                 raise ValueError(
@@ -977,10 +978,17 @@ class SuttonReportProcessor:
 
                 raise ValueError(f"Unknown Sutton report name: " f"{report_name}")
 
-            logger.info(
-                "Successfully processed Sutton " "report type=%s",
-                report_name,
-            )
+            if stats["errors"]:
+                logger.warning(
+                    "Sutton report type=%s completed with %s row error(s)",
+                    report_name,
+                    stats["errors"],
+                )
+            else:
+                logger.info(
+                    "Successfully processed Sutton report type=%s",
+                    report_name,
+                )
 
             return stats
 
