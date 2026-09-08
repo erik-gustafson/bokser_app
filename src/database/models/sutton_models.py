@@ -18,6 +18,8 @@ from sqlalchemy import (
     DateTime,
     Index,
     PrimaryKeyConstraint,
+    Identity,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -545,16 +547,18 @@ class SuttonOpenOrderReport(Base):
     Sutton Open Order Report data.
     Tracks currently open orders in the Sutton system.
 
-    Composite Primary Key: (company, customer_acct, purchase_order, warehouse_batch, sku)
+    Generated primary key with a unique order identity, allowing an absent batch.
     """
 
     __tablename__ = "open_order_report"
 
-    # Composite Primary Key Components
+    id: Mapped[int] = mapped_column(Integer, Identity(), primary_key=True)
+
+    # Order identity
     company: Mapped[str] = mapped_column(String, nullable=False)
     customer_acct: Mapped[str] = mapped_column(String, nullable=False)
     purchase_order: Mapped[str] = mapped_column(String, nullable=False)
-    warehouse_batch: Mapped[str] = mapped_column(String, nullable=False)
+    warehouse_batch: Mapped[str | None] = mapped_column(String, nullable=True)
     sku: Mapped[str] = mapped_column(String, nullable=False)
 
     # Customer Info
@@ -585,13 +589,24 @@ class SuttonOpenOrderReport(Base):
     )
 
     __table_args__ = (
-        PrimaryKeyConstraint(
+        Index(
+            "uq_sutton_open_order_with_batch",
             "company",
             "customer_acct",
             "purchase_order",
             "warehouse_batch",
             "sku",
-            name="pk_sutton_open_order",
+            unique=True,
+            postgresql_where=text("warehouse_batch IS NOT NULL"),
+        ),
+        Index(
+            "uq_sutton_open_order_without_batch",
+            "company",
+            "customer_acct",
+            "purchase_order",
+            "sku",
+            unique=True,
+            postgresql_where=text("warehouse_batch IS NULL"),
         ),
         Index("idx_sutton_oo_customer", "customer_acct"),
         Index("idx_sutton_oo_po", "purchase_order"),

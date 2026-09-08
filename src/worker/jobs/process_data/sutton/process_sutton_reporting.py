@@ -1194,6 +1194,13 @@ class SuttonReportProcessor:
             mapper = inspect(cls)
 
             pk_columns = [col.name for col in mapper.primary_key]
+            if cls is SuttonOpenOrderReport:
+                pk_columns = [
+                    "company", "customer_acct", "purchase_order", "warehouse_batch", "sku"
+                ]
+            required_key_columns = [
+                key for key in pk_columns if not mapper.columns[key].nullable
+            ]
 
             logger.info(
                 "Primary key columns for %s: %s",
@@ -1242,7 +1249,7 @@ class SuttonReportProcessor:
                     )
 
                     missing_pk_fields = [
-                        pk for pk in pk_columns if not mapped_data.get(pk)
+                        pk for pk in required_key_columns if not mapped_data.get(pk)
                     ]
 
                     if missing_pk_fields:
@@ -1262,7 +1269,7 @@ class SuttonReportProcessor:
 
                         continue
 
-                    pk_filter = {pk: mapped_data[pk] for pk in pk_columns}
+                    pk_filter = {pk: mapped_data.get(pk) for pk in pk_columns}
 
                     existing = db.query(cls).filter_by(**pk_filter).first()
 

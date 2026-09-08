@@ -63,6 +63,8 @@ async def load_ship_sync_table():
 
     ship_tasks = SosShipmentSyncTasks()
 
+    # await ship_tasks.direct_load_to_sync_table()
+
     await ship_tasks.process_shipment_sync()
 
 
