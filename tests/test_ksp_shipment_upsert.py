@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from datetime import datetime, timezone
 from typing import Any
+from unittest.mock import AsyncMock, patch
 
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
@@ -40,6 +41,9 @@ class _AsyncSessionAdapter:
 
     async def get(self, *args: Any, **kwargs: Any) -> Any:
         return self._session.get(*args, **kwargs)
+
+    async def scalar(self, *args: Any, **kwargs: Any) -> Any:
+        return self._session.scalar(*args, **kwargs)
 
     def add(self, instance: Any) -> None:
         self._session.add(instance)
@@ -138,6 +142,12 @@ class KSPShipmentUpsertTests(unittest.IsolatedAsyncioTestCase):
         KSPShipmentHeaders.metadata.create_all(self.connection, tables=tables)
         self.session = Session(self.connection, expire_on_commit=False)
         self.async_session = _AsyncSessionAdapter(self.session)
+        sync_patch = patch(
+            "src.worker.jobs.process_data.warehouses.process_shipment_data.add_to_shipment_sync",
+            new_callable=AsyncMock,
+        )
+        sync_patch.start()
+        self.addCleanup(sync_patch.stop)
 
     def tearDown(self) -> None:
         self.session.close()
@@ -166,13 +176,18 @@ class KSPShipmentUpsertTests(unittest.IsolatedAsyncioTestCase):
             warehouse="ksp",
         )
 
-        self.assertEqual(result, {"loaded": 2, "failed": []})
+        self.assertEqual(result, {"loaded": 2, "skipped": 0, "failed": []})
         self.assertEqual(
             self.session.scalar(select(func.count()).select_from(KSPShipmentHeaders)),
             1,
         )
 
-        header = self.session.get(KSPShipmentHeaders, ("17848", "5118683245"))
+        header = self.session.scalar(
+            select(KSPShipmentHeaders).where(
+                KSPShipmentHeaders.cust_ref == "17848",
+                KSPShipmentHeaders.cust_po_no == "5118683245",
+            )
+        )
         self.assertIsNotNone(header)
         assert header is not None
         self.assertEqual(header.order_status, "shipped")
@@ -189,6 +204,44 @@ class KSPShipmentUpsertTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("SKU-2", items)
         self.assertIn("TRACK-2", details)
         self.assertIn("TRACK-STALE", details)
+
+    async def test_duplicate_items_sum_and_later_loads_replace_totals(self) -> None:
+        for quantities, expected in [([10, 10], 20), ([10, 10], 20), ([4, 3], 7), ([0, 0], 0)]:
+            payload = _shipment_payload(
+                status="shipped", carrier="UPS", quantity=1,
+                delivered_at="2026-09-01T13:00:00+00:00",
+            )
+            payload["shipments"][0]["items"] = [
+                {"item": "810098935463", "quantity": quantity}
+                for quantity in quantities
+            ] + [{"item": "OTHER", "quantity": 2}]
+            result = await load_shipment_records(self.async_session, [payload], "ksp")
+            self.assertEqual(result, {"loaded": 1, "skipped": 0, "failed": []})
+            items = self.session.scalars(select(KSPShipmentDetailItems)).all()
+            self.assertEqual(len(items), 2)
+            self.assertEqual({item.item: item.quantity for item in items}, {
+                "810098935463": expected, "OTHER": 2,
+            })
+
+    async def test_duplicate_items_in_new_detail_on_existing_shipment(self) -> None:
+        payload = _shipment_payload(
+            status="shipped", carrier="UPS", quantity=5,
+            delivered_at="2026-09-01T13:00:00+00:00",
+        )
+        await load_shipment_records(self.async_session, [payload], "ksp")
+        payload["shipments"][0]["tracking_no"] = "NEW-TRACK"
+        payload["shipments"][0]["items"] = [
+            {"item": "SKU-1", "quantity": 10},
+            {"item": "SKU-1", "quantity": 10},
+        ]
+        result = await load_shipment_records(self.async_session, [payload], "ksp")
+        self.assertEqual(result, {"loaded": 1, "skipped": 0, "failed": []})
+        details = self.session.scalars(select(KSPShipmentDetails)).all()
+        self.assertEqual(len(details), 2)
+        self.assertEqual({detail.tracking_no: [(item.item, item.quantity) for item in detail.items]
+                          for detail in details}, {
+            "TRACK-1": [("SKU-1", 5)], "NEW-TRACK": [("SKU-1", 20)],
+        })
 
 
 if __name__ == "__main__":

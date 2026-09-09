@@ -149,6 +149,31 @@ class SosSettings(AppBaseSettings):
         for endpoint in SOS_ENDPOINTS
     }
 
+    SOS_SHIPMENT_LOCATIONS: dict[str, dict[str, Any]] = Field(
+        default_factory=lambda: {
+            "CLT": {"id": 1, "name": "Productiv CLT"},
+            "SAY": {"id": 2, "name": "ESS Sayreville"},
+            "CDC": {"id": 3, "name": "CDC"},
+            "KSP": {"id": 4, "name": "KSP"},
+        }
+    )
+
+    SOS_SHIPMENT_METHOD_IDS: dict[str, int] = Field(
+        default_factory=lambda: {
+            "UPS": 1,
+            "FEDEX": 2,
+            "DHL": 3,
+            "USPS": 4,
+            "LTL": 5,
+            "Small Parcel": 7
+        }
+    )
+
+    SOS_DEFAULT_LOCATION_ID: int = 1
+    SOS_DEFAULT_LOCATION_NAME: str = "Productiv CLT"
+    SOS_MARKETPLACE_LOCATION_ID: int = 4
+    SOS_MARKETPLACE_LOCATION_NAME: str = "KSP"
+
     @classmethod
     def get_endpoint(cls, name: str) -> SOSEndpoint:
         try:

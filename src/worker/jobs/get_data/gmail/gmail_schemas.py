@@ -11,7 +11,7 @@ class EmailDownloadRequest(BaseModel):
         description="Guest Supply Order PDF search query",
     )
     sutton_report_gmail_query: str = Field(
-        default="has:attachment from:REPORT-FROM-AS400@essutton.com label:unread",
+        default="has:attachment from:REPORT-FROM-AS400@essutton.com label:unread -label:PROCESSED",
         description="Sutton Report search query",
     )
     download_path: Optional[str] = Field(

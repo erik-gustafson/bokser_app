@@ -16,6 +16,7 @@ from sqlalchemy.dialects.postgresql import insert
 from src.worker.jobs.process_data.utils import data_lake_tools
 
 from src.database.models import *
+from src.database.utils.shipment_sync_queue import shipment_sync_upsert
 from src.database.utils import model_tools
 from src.database.utils.formatter_tools import (
     parse_dt,
@@ -296,22 +297,7 @@ async def add_to_shipment_sync(
 
     payload_hash = hash_payload(payload)
 
-    stmt = (
-        insert(SosShipmentSync)
-        .values(
-            source=source,
-            source_id=source_id,
-            payload_hash=payload_hash,
-            status="pending",
-        )
-        .on_conflict_do_update(
-            constraint="ux_sos_shipment_sync_source_key",
-            set_={
-                "status": "pending",
-                "payload_hash": payload_hash,
-            },
-        )
-    )
+    stmt = shipment_sync_upsert(source, source_id, payload_hash)
 
     await session.execute(stmt)
 
@@ -566,7 +552,17 @@ class KSPShipmentMapper:
             date=parse_dt(data.get("date")),
         )
 
-        detail.items = [cls._map_detail_item(item) for item in data.get("items") or []]
+        # Each payload supplies a replacement total per (ship_detail_id, item).
+        # Sum duplicate lines here, before either inserting or merging the detail.
+        items_by_code: dict[str, KSPShipmentDetailItems] = {}
+        for raw_item in data.get("items") or []:
+            item = cls._map_detail_item(raw_item)
+            current = items_by_code.get(item.item)
+            if current is None:
+                items_by_code[item.item] = item
+            else:
+                current.quantity += item.quantity
+        detail.items = list(items_by_code.values())
 
         return detail
 

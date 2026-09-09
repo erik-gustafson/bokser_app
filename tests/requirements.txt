@@ -1,0 +1,2 @@
+# Additional dependency for isolated async database tests.
+aiosqlite>=0.20

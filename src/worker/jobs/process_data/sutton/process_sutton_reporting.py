@@ -15,12 +15,12 @@ import pandas as pd
 
 from dateutil import parser
 
-from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.inspection import inspect
 from sqlalchemy.orm import Session
 
 from src.database.database import SessionLocal, async_session
 from src.database.models import *
+from src.database.utils.shipment_sync_queue import shipment_sync_upsert
 from src.worker.jobs.process_data.utils import data_lake_tools
 from src.worker.jobs.process_data.utils.data_lake_tools import ClaimedLakeFile
 
@@ -1010,13 +1010,13 @@ class SuttonReportProcessor:
         df: pd.DataFrame,
     ) -> None:
 
-        sales_report_invs = df["column_name"].dropna().unique().tolist()
+        sales_report_invs = df["invoice"].dropna().unique().tolist()
 
         for inv in sales_report_invs:
 
             records = (
-                df.loc[df["column_name"] == inv]
-                .sort_values(["style"])  # or another stable unique column
+                df.loc[df["invoice"] == inv]
+                .sort_values(["style", "purchase_order", "warehouse_batch_number"])
                 .to_dict(orient="records")
             )
 
@@ -1029,21 +1029,7 @@ class SuttonReportProcessor:
 
             payload_hash = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
-            stmt = (
-                insert(SosShipmentSync)
-                .values(
-                    source="sutton",
-                    source_id=str(inv),
-                    status="pending",
-                    payload_hash=payload_hash,
-                )
-                .on_conflict_do_update(
-                    constraint="ux_sos_shipment_sync_source_key",
-                    set_={
-                        "status": "pending",
-                    },
-                )
-            )
+            stmt = shipment_sync_upsert("sutton", str(inv), payload_hash)
 
             db.execute(stmt)
 

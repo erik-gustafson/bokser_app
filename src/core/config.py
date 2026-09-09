@@ -14,6 +14,7 @@ class Settings(
     ProductivSettings,
     AcendaSettings,
     BokserAPISettings,
+    ShipmentProcessingSettings,
 ):
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),

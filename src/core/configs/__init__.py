@@ -7,6 +7,7 @@ from .sos import SosSettings
 from .productiv import ProductivSettings
 from .acenda import AcendaSettings
 from .bokser_api import BokserAPISettings
+from .shipment_processing import ShipmentProcessingSettings
 
 __all__ = [
     "AppBaseSettings",
@@ -18,4 +19,5 @@ __all__ = [
     "ProductivSettings",
     "AcendaSettings",
     "BokserAPISettings",
+    "ShipmentProcessingSettings",
 ]

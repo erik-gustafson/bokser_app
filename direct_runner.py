@@ -63,16 +63,21 @@ async def load_ship_sync_table():
 
     ship_tasks = SosShipmentSyncTasks()
 
-    # await ship_tasks.direct_load_to_sync_table()
+    await ship_tasks.direct_load_to_sync_table()
+
+
+async def process_ship_sync_table():
+
+    ship_tasks = SosShipmentSyncTasks()
 
     await ship_tasks.process_shipment_sync()
 
 
 if __name__ == "__main__":
 
-    asyncio.run(load_ship_sync_table())
+    # asyncio.run(process_ship_sync_table())
 
-    asyncio.run(get_gmail_data())
+    # asyncio.run(get_gmail_data())
 
     asyncio.run(shipment_load_to_db(limit=150))
 
