@@ -86,8 +86,9 @@ async def im_webhook_new(
             session=db,
             raw_writer=raw_writer,
             records=records,
-            source_name=source,
+            source_name="ksp",
             endpoint_name=event_type_str,
+            metadata={"cart_name": source},
         )
 
     return {"ok": True}

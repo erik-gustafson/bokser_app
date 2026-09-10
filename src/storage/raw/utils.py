@@ -16,6 +16,7 @@ async def write_payload_to_data_lake(
     records: dict[str, Any] | list[Any],
     source_name: str,
     endpoint_name: str,
+    metadata: Mapping[str, Any] | None = None,
 ):
 
     if records:
@@ -23,6 +24,7 @@ async def write_payload_to_data_lake(
             source_system=source_name,
             entity_name=endpoint_name,
             payload=records,
+            metadata=metadata,
         )
 
         session.add(
