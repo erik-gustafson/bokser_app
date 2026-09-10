@@ -86,7 +86,7 @@ async def im_webhook_new(
             session=db,
             raw_writer=raw_writer,
             records=records,
-            source_name="ksp",
+            source_name=source,
             endpoint_name=event_type_str,
         )
 

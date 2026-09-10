@@ -75,11 +75,12 @@ async def process_ship_sync_table():
 
 if __name__ == "__main__":
 
-    # asyncio.run(process_ship_sync_table())
+    # asyncio.run(load_ship_sync_table())
+    asyncio.run(process_ship_sync_table())
 
     # asyncio.run(get_gmail_data())
 
-    asyncio.run(shipment_load_to_db(limit=150))
+    # asyncio.run(shipment_load_to_db(limit=150))
 
     acenda_order_push = AcendaOrderPush()
 

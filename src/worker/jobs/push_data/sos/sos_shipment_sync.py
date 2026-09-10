@@ -537,11 +537,12 @@ class SosShipmentSyncTasks:
                 ("productiv", ProductivShipmentHeaders),
             ]
 
-            cutoff_date = datetime(2026, 8, 27)
+            cutoff_date = datetime(2026, 5, 1)
 
             for source_name, model in sources:
 
                 if source_name == "sutton":
+                    continue
                     source_id = model.invoice
                     _date = model.date
 
@@ -550,6 +551,7 @@ class SosShipmentSyncTasks:
                     _date = model.delivered_to_wms_date
 
                 elif source_name == "productiv":
+                    continue
                     source_id = model.order_id
                     _date = model.ship_date
 
@@ -564,6 +566,7 @@ class SosShipmentSyncTasks:
                     source_id_str,
                 ).where(
                     _date >= cutoff_date,
+                    model.cust_po_no.startswith("9"),
                     ~exists(
                         select(1).where(
                             SosShipmentSync.source == source_name,

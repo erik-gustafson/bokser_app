@@ -18,8 +18,11 @@ from pathlib import Path, PurePosixPath
 
 
 async def import_shipment_history(
-    path: Path, warehouse: str = "productiv", *,
-    lake_root: Path | None = None, worker_lake_root: str | None = None,
+    path: Path,
+    warehouse: str = "productiv",
+    *,
+    lake_root: Path | None = None,
+    worker_lake_root: str | None = None,
 ) -> int:
     entities = {"productiv": "orderconfirm", "ksp": "order_update"}
     if warehouse not in entities:
@@ -54,27 +57,41 @@ async def import_shipment_history(
         body = resource.get("body") if isinstance(resource, dict) else None
         read_only = body.get("readOnly") if isinstance(body, dict) else None
         if not isinstance(read_only, dict) or read_only.get("orderId") is None:
-            contexts = [value for value in (record, resource, body)
-                        if isinstance(value, dict)]
+            contexts = [
+                value for value in (record, resource, body) if isinstance(value, dict)
+            ]
             external_id = next(
-                (value[key] for value in contexts for key in ("external_id", "externalId")
-                 if value.get(key) is not None), None,
+                (
+                    value[key]
+                    for value in contexts
+                    for key in ("external_id", "externalId")
+                    if value.get(key) is not None
+                ),
+                None,
             )
             event_id = next(
-                (value["wmsEventId"] for value in contexts
-                 if value.get("wmsEventId") is not None), None,
+                (
+                    value["wmsEventId"]
+                    for value in contexts
+                    if value.get("wmsEventId") is not None
+                ),
+                None,
             )
             logging.warning(
                 "Skipping Productiv record at index %s: missing "
                 "resource.body.readOnly.orderId; external_id=%s wmsEventId=%s",
-                index, external_id, event_id,
+                index,
+                external_id,
+                event_id,
             )
             skipped += 1
             continue
         valid_records.append(record)
 
     records = valid_records
-    logging.info("Validated %s payloads; skipped %s from %s.", len(records), skipped, path)
+    logging.info(
+        "Validated %s payloads; skipped %s from %s.", len(records), skipped, path
+    )
 
     if not records:
         logging.info("No payloads in %s; nothing written.", path)
@@ -99,28 +116,36 @@ async def import_shipment_history(
         raise FileNotFoundError(f"Lake root does not exist: {local_root}")
 
     result = RawPayloadWriter(local_root).write_json_payload(
-        source_system=warehouse, entity_name=entities[warehouse], payload=records,
+        source_system=warehouse,
+        entity_name=entities[warehouse],
+        payload=records,
     )
     registered_path = str(result.file_path)
     if worker_lake_root is not None:
-        registered_path = str(PurePosixPath(worker_lake_root).joinpath(
-            *result.file_path.relative_to(local_root).parts
-        ))
+        registered_path = str(
+            PurePosixPath(worker_lake_root).joinpath(
+                *result.file_path.relative_to(local_root).parts
+            )
+        )
 
     async with async_session() as session:
-        session.add(DataLakeFile(
-            source_name=warehouse,
-            entity_name=entities[warehouse],
-            file_path=registered_path,
-            file_name=result.file_name,
-            record_count=result.record_count,
-            file_size_bytes=result.file_size_bytes,
-            sha256=result.sha256,
-            landed_at=result.written_at_utc,
-            status="LANDED",
-        ))
+        session.add(
+            DataLakeFile(
+                source_name=warehouse,
+                entity_name=entities[warehouse],
+                file_path=registered_path,
+                file_name=result.file_name,
+                record_count=result.record_count,
+                file_size_bytes=result.file_size_bytes,
+                sha256=result.sha256,
+                landed_at=result.written_at_utc,
+                status="LANDED",
+            )
+        )
         await session.commit()
-    logging.info("Wrote %s; registered worker path %s", result.file_path, registered_path)
+    logging.info(
+        "Wrote %s; registered worker path %s", result.file_path, registered_path
+    )
 
     logging.info("Landed %s %s payloads from %s.", len(records), warehouse, path)
     return len(records)
@@ -139,14 +164,22 @@ if __name__ == "__main__":
         default="productiv",
         help="Payload source (default: productiv)",
     )
-    parser.add_argument("--lake-root", type=Path, help="Local path to the worker's shared lake")
-    parser.add_argument("--worker-lake-root", help="Linux mount path, e.g. /app/data_lake")
+    parser.add_argument(
+        "--lake-root", type=Path, help="Local path to the worker's shared lake"
+    )
+    parser.add_argument(
+        "--worker-lake-root", help="Linux mount path, e.g. /app/data_lake"
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-    asyncio.run(import_shipment_history(
-        args.json_file, args.warehouse,
-        lake_root=args.lake_root, worker_lake_root=args.worker_lake_root,
-    ))
+    asyncio.run(
+        import_shipment_history(
+            args.json_file,
+            args.warehouse,
+            lake_root=args.lake_root,
+            worker_lake_root=args.worker_lake_root,
+        )
+    )
 
 
 """
