@@ -61,7 +61,7 @@ async def im_webhook_new(
     # Log the webhook event
     db.add(
         BokserAPIWebhookEvent(
-            source="ksp",
+            source=source,
             event_type=event_type_str,
             signature_valid=bool(signature_valid),
             payload=records or [],
@@ -78,6 +78,10 @@ async def im_webhook_new(
             status_code=500,
             detail="Unable to determine webhook source",
         )
+
+    # bh_marchant for order update is a dupliacted send that overwrites cart is second to be sent, accept and dont write
+    if source == "bh_merchant" and event_type_str == "order_update":
+        return {"ok": True}
 
     raw_writer = request.app.state.raw_writer
 
@@ -293,42 +297,3 @@ def _verify_ups_track_alert_bearer(authorization: str | None) -> bool:
     if not candidate_token:
         return False
     return secrets.compare_digest(candidate_token, expected_token)
-
-
-# async def write_payload_to_data_lake(
-#     session: AsyncSession,
-#     raw_writer: RawPayloadWriter,
-#     records: dict[str, Any] | list[Any],
-#     source_name: str,
-#     endpoint_name: str,
-# ):
-
-#     if records:
-#         write_result = raw_writer.write_json_payload(
-#             source_system=source_name,
-#             entity_name=endpoint_name,
-#             payload=records,
-#         )
-
-#         session.add(
-#             DataLakeFile(
-#                 source_name=source_name,
-#                 entity_name=endpoint_name,
-#                 file_path=str(write_result.file_path),
-#                 file_name=write_result.file_name,
-#                 record_count=write_result.record_count,
-#                 file_size_bytes=write_result.file_size_bytes,
-#                 sha256=write_result.sha256,
-#                 landed_at=write_result.written_at_utc,
-#                 status="LANDED",
-#             )
-#         )
-
-#         await session.commit()
-
-#         logger.info(
-#             f"Fetched and wrote {source_name} endpoint=%s records=%s file=%s",
-#             endpoint_name,
-#             write_result.record_count,
-#             write_result.file_path,
-#         )
