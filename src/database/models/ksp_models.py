@@ -26,6 +26,7 @@ class KSPShipmentHeaders(Base):
 
     cust_ref: Mapped[str] = mapped_column(String)
     cust_po_no: Mapped[str] = mapped_column(String, index=True)
+    source_name: Mapped[str | None] = mapped_column(String, nullable=True)
 
     delivered_to_wms_date: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),

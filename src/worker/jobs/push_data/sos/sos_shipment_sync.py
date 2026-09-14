@@ -188,7 +188,7 @@ class SosShipmentSyncTasks:
                 )
 
             mapped_sales_order_list = await self.get_sos_so_id_by_po(
-                ship_data[0].purchase_order
+                ship_data[0].purchase_order, sos_channel=None
             )
 
             if not mapped_sales_order_list:
@@ -278,8 +278,23 @@ class SosShipmentSyncTasks:
                     f"KSP Ship Data Not Found in DB: " f"source_id={_sync.source_id}"
                 )
 
+            ship_date = max([detail.date for detail in ship_data.ship_details])
+
+            if ship_date and ship_date < datetime(
+                2026, 5, 1, 0, 0, 0, tzinfo=timezone.utc
+            ):
+                raise ValueError(
+                    f"KSP Ship Date Prior to 5/1 Cutoff: "
+                    f"source_id={_sync.source_id}"
+                )
+
+            if ship_data.source_name in settings.KSP_DTC_CARTS:
+                sos_channel = "DTC"
+            else:
+                sos_channel = None
+
             mapped_sales_order_list = await self.get_sos_so_id_by_po(
-                ship_data.cust_po_no
+                ship_data.cust_po_no, sos_channel=sos_channel
             )
 
             if not mapped_sales_order_list:
@@ -594,19 +609,23 @@ class SosShipmentSyncTasks:
             await session.commit()
 
     async def get_sos_so_id_by_po(
-        self,
-        purchase_order: str,
+        self, purchase_order: str, sos_channel: str | None
     ) -> list[SosSalesOrderHeader] | None:
 
         mapped_list: list[SosSalesOrderHeader] = []
 
+        params = {
+            "query": purchase_order,
+            "status": "open",
+        }
+
+        if sos_channel:
+            params.update({"channel": sos_channel})
+
         try:
             result = await self.sos_client.get(
                 path_or_url="/salesorder/",
-                params={
-                    "query": purchase_order,
-                    "status": "open",
-                },
+                params=params,
             )
 
             if result.status_code != 200:

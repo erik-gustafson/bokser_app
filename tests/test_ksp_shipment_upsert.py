@@ -154,6 +154,25 @@ class KSPShipmentUpsertTests(unittest.IsolatedAsyncioTestCase):
         self.connection.close()
         self.engine.dispose()
 
+    async def test_cart_metadata_sets_updates_and_preserves_source_name(self) -> None:
+        payload = _shipment_payload(
+            status="shipped", carrier="UPS", quantity=1,
+            delivered_at="2026-09-01T13:00:00+00:00",
+        )
+        for metadata, expected in [
+            (None, None),
+            ({"cart_name": "cart-a"}, "cart-a"),
+            ({"cart_name": "cart-b"}, "cart-b"),
+            ({}, "cart-b"),
+        ]:
+            result = await load_shipment_records(
+                self.async_session, [payload], "ksp", metadata=metadata,
+            )
+            self.assertEqual(result, {"loaded": 1, "skipped": 0, "failed": []})
+            self.session.expire_all()
+            header = self.session.scalar(select(KSPShipmentHeaders))
+            self.assertEqual(header.source_name, expected)
+
     async def test_duplicate_header_key_updates_graph_without_duplicate_insert(self) -> None:
         first = _shipment_payload(
             status="processing",

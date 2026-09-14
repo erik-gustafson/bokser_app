@@ -40,3 +40,13 @@ class ShipmentProcessingSettings(AppBaseSettings):
     }
 
     SMALL_PARCEL_CARRIERS: list[str] = ["UPS", "FEDEX", "USPS", "DHL", "SMALL PARCEL"]
+
+    KSP_DTC_CARTS: list[str] = [
+        "ksp_walmart_cart",
+        "ksp_bbb_cart",
+        "ksp_wayfair_cart",
+        "ksp_kohls_cart",
+        "ksp_macys_cart",
+        "ksp_shopify_cart",
+        "ksp_target_cart",
+    ]

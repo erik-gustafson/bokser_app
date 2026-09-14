@@ -187,3 +187,31 @@ if __name__ == "__main__":
 .venv\Scripts\python.exe import_productiv_history.py ksp_history.json --warehouse ksp
 
 """
+
+
+"""
+
+"Target Plus US Marketplace": ksp_target_cart
+"Macys": ksp_macys_cart
+"Walmart US" : ksp_walmart_cart
+"Overstock": ksp_bbb_cart
+"Wayfair": ksp_wayfair_cart
+"Kohls": ksp_kohls_cart
+"bokserhome.myshopify.com": ksp_shopify_cart
+
+"""
+
+
+"""
+("bh_merchant", settings.IM_BH_MERCHANT_KEY),
+("bh_cart", settings.IM_BH_CART_KEY),
+("ksp_merchant", settings.IM_KSP_MERCHANT_KEY),
+("ksp_b2b_cart", settings.IM_CART_BH_B2B_KEY),
+("ksp_walmart_cart", settings.IM_CART_WALMART_B2B_KEY),
+("ksp_bbb_cart", settings.IM_CART_BBB_KEY),
+("ksp_wayfair_cart", settings.IM_CART_WAYFAIR_KEY),
+("ksp_kohls_cart", settings.IM_CART_KOHLS_KEY),
+("ksp_macys_cart", settings.IM_CART_MACYS_KEY),
+("ksp_shopify_cart", settings.IM_CART_SHOPIFY_KEY),
+("ksp_target_cart", settings.IM_CART_TARGET_KEY),
+"""

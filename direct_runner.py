@@ -80,7 +80,7 @@ if __name__ == "__main__":
 
     # asyncio.run(get_gmail_data())
 
-    # asyncio.run(shipment_load_to_db(limit=150))
+    asyncio.run(shipment_load_to_db(limit=150))
 
     acenda_order_push = AcendaOrderPush()
 

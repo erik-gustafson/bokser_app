@@ -111,6 +111,7 @@ async def load_whse_shipment_lake_files(
                         session=session,
                         records=records,
                         warehouse=source_name,
+                        metadata=file_data["metadata"],
                     )
 
                     db_file = await session.get(
@@ -198,6 +199,8 @@ async def load_shipment_records(
     session: AsyncSession,
     records: list[dict[str, Any]],
     warehouse: str,
+    *,
+    metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
 
     loaded = 0
@@ -214,7 +217,11 @@ async def load_shipment_records(
                     "No cust_ref provided!",
                 )
 
-                shipment = KSPShipmentMapper.map_shipment(raw_record)
+                cart_name = (metadata or {}).get("cart_name")
+                shipment = KSPShipmentMapper.map_shipment(
+                    raw_record,
+                    source_name=as_str(cart_name) if cart_name is not None else None,
+                )
 
                 async with session.begin_nested():
                     await post_ksp_shipment_data(
@@ -522,9 +529,12 @@ class KSPShipmentMapper:
     def map_shipment(
         cls,
         data: dict[str, Any],
+        *,
+        source_name: str | None = None,
     ) -> KSPShipmentHeaders:
 
         shipment = KSPShipmentHeaders(
+            source_name=source_name,
             cust_ref=as_str(data.get("cust_ref")),
             cust_po_no=as_str(data.get("cust_po_no")),
             delivered_to_wms_date=parse_dt(data.get("delivered_to_wms_date")),
