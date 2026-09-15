@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 SHIPMENT_ENTITIES = [("ksp", "order_update"), ("productiv", "orderconfirm")]
-
+KSP_CARTS_FOR_SOS_SYNC = ["ksp_b2b_cart"]
 ### local dev begin ###
 
 
@@ -229,12 +229,13 @@ async def load_shipment_records(
                         shipment,
                     )
 
-                    await add_to_shipment_sync(
-                        session=session,
-                        source=warehouse,
-                        source_id=str(record_id),
-                        payload=shipment.to_json(),
-                    )
+                    if cart_name in KSP_CARTS_FOR_SOS_SYNC:
+                        await add_to_shipment_sync(
+                            session=session,
+                            source=warehouse,
+                            source_id=str(record_id),
+                            payload=shipment.to_json(),
+                        )
 
             elif warehouse == "productiv":
                 body = raw_record.get("resource", {}).get("body", {})
