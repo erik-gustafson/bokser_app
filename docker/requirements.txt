@@ -14,7 +14,10 @@ psycopg[binary]
 pydantic
 pydantic-settings
 python-dateutil
-sqlalchemy
+sqlalchemy[asyncio]
 uvicorn[standard]
 xlrd
 XlsxWriter
+anyio>=4.14.2,<5
+urllib3>=2.8.0,<3
+idna>=3.15,<4
