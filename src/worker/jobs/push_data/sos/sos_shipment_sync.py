@@ -1,5 +1,5 @@
 import logging
-
+import json
 
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
@@ -281,31 +281,11 @@ class SosShipmentSyncTasks:
             ship_date = max([detail.date for detail in ship_data.ship_details])
 
             if ship_date and ship_date < datetime(
-                2026, 5, 1, 0, 0, 0, tzinfo=timezone.utc
+                2026, 9, 1, 0, 0, 0, tzinfo=timezone.utc
             ):
                 raise ValueError(
-                    f"KSP Ship Date Prior to 5/1 Cutoff: "
+                    f"KSP Ship Date Prior to 9/1 Cutoff: "
                     f"source_id={_sync.source_id}"
-                )
-
-            if ship_data.source_name in settings.KSP_DTC_CARTS:
-                sos_channel = "DTC"
-            else:
-                sos_channel = None
-
-            mapped_sales_order_list = await self.get_sos_so_id_by_po(
-                ship_data.cust_po_no, sos_channel=sos_channel
-            )
-
-            if not mapped_sales_order_list:
-                raise ValueError(
-                    f"Sales Order Not Found with KSP PO: " f"{ship_data.cust_po_no}"
-                )
-
-            if len(mapped_sales_order_list) > 1:
-                raise ValueError(
-                    f"Multiple Sales Orders Found with KSP PO: "
-                    f"{ship_data.cust_po_no}"
                 )
 
             lines = [
@@ -323,6 +303,7 @@ class SosShipmentSyncTasks:
                 raise ValueError("No KSP shipment items found")
 
             _carrier = str([num.carrier for num in ship_data.ship_details][0]).lower()
+            _sos_id = as_int(ship_data.cust_ref.split("-")[0])
 
             if _carrier in settings.KSP_SMALL_PARCEL_CODES:
                 carrier = settings.KSP_SMALL_PARCEL_CODES.get(_carrier, ("Missing"))[0]
@@ -336,7 +317,7 @@ class SosShipmentSyncTasks:
 
             _ship_data = ShipmentData(
                 warehouse="KSP",
-                sos_sales_order_id=(mapped_sales_order_list[0].id),
+                sos_sales_order_id=_sos_id,
                 date=self._serialize_datetime(ship_data.ship_details[0].date),
                 tracking_no=str([num.tracking_no for num in ship_data.ship_details][0]),
                 carrier=carrier,
@@ -662,6 +643,7 @@ class SosShipmentSyncTasks:
         )
 
         if response.status_code != 200:
+
             logger.error(
                 f"SOS Shipment Template Request Failed: "
                 f"sales_order_id={id}, "

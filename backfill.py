@@ -22,8 +22,40 @@ from src.storage.raw.writer import RawPayloadWriter
 from src.database.database import async_session
 from src.database.models.data_lake_models import DataLakeFile
 from src.database.models import BokserAPIWebhookEvent
+from src.integrations.acenda_client import AcendaClient
 
 logger = logging.getLogger(__name__)
+
+
+async def export_acenda_catalog() -> Path:
+    """Save the entire unfiltered catalog as JSON in repo-root acenda_catalog.py."""
+    records: list[dict[str, Any]] = []
+    page = 1
+
+    async with AcendaClient() as client:
+        while True:
+            response = await client.get("/catalog", params={"page": page})
+            response.raise_for_status()
+            payload = response.json()
+            if payload.get("errors"):
+                raise ValueError(f"Acenda catalog errors: {payload['errors']}")
+            batch = payload.get("result")
+            if batch is None and payload.get("num_results") == 0:
+                batch = []
+            if not isinstance(batch, list):
+                raise ValueError(f"Expected Acenda catalog result list on page {page}")
+            # num_results can describe this page, rather than the full catalog.
+            # Keep requesting pages until the API returns an empty result list.
+            if not batch:
+                break
+            records.extend(batch)
+            page += 1
+
+    output = Path(__file__).resolve().parent / "acenda_catalog.py"
+    with output.open("w", encoding="utf-8") as file:
+        json.dump(records, file, ensure_ascii=False, indent=2)
+        file.write("\n")
+    return output
 
 
 def parse_dt(value: str | None) -> datetime | None:
@@ -291,6 +323,14 @@ async def write_payload_to_data_lake(
 
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--acenda-catalog", action="store_true", help="Export the full Acenda catalog as JSON")
+    args = parser.parse_args()
+    if args.acenda_catalog:
+        print(asyncio.run(export_acenda_catalog()))
+        raise SystemExit(0)
 
     asyncio.run(sort_webhook_files())
 
