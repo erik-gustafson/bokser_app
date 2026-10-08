@@ -111,6 +111,15 @@ class Initiator:
                 await self.store.update_initiation(oid, 'PENDING', tracking_request_id=str(UUID(found['id'])))
                 await self.resolve_request(row, found)
                 return True
+            if row['request_type'] != 'container' and hasattr(self.store, 'shipment_submission'):
+                owner = await self.store.shipment_submission(row)
+                if owner:
+                    if owner['tracking_request_id']:
+                        rid = str(owner['tracking_request_id'])
+                        await self.store.update_initiation(oid, 'PENDING', tracking_request_id=rid)
+                        await self.resolve_request(row, (await self.client.get_tracking_request(rid))['data'])
+                        return True
+                    raise ReviewRequired('A shipment submission already uses this reference. No duplicate request was sent; check its shipment status.')
             if row['status'] == 'SUBMITTING':
                 # A prior POST may have reached the provider. Never repeat it.
                 raise ReviewRequired('Submission outcome is uncertain. No duplicate request was sent. Review Terminal49 tracking requests and link its UUID manually if created.')

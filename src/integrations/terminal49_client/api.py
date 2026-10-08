@@ -28,6 +28,15 @@ class InitiationRequest(BaseModel):
     scac: str = Field(default='', max_length=4)
 
 
+class ShipmentRequest(BaseModel):
+    model_config = {'extra': 'forbid'}
+    company_id: int = Field(gt=0)
+    odoo_shipment_id: int = Field(gt=0)
+    request_type: str
+    request_number: str = Field(min_length=1, max_length=64)
+    scac: str = Field(default='', max_length=4)
+
+
 def create_app(config=None, store=None):
     # No configuration or network I/O at module import; helps isolated tests.
     @asynccontextmanager
@@ -112,6 +121,29 @@ def create_app(config=None, store=None):
         result = await request.app.state.store.initiation_status(odoo_id)
         if result is None:
             raise HTTPException(404, 'Tracking operation not found')
+        return result
+
+    @app.post('/v1/shipments/tracking/requests', status_code=202, dependencies=[Depends(authenticate)])
+    async def shipment_start(body: ShipmentRequest, request: Request):
+        if body.company_id != request.app.state.config.odoo_company_id:
+            raise HTTPException(409, 'Tracking service company does not match Odoo')
+        from .shipments import ShipmentStore
+        try:
+            return await ShipmentStore(request.app.state.store).start(body.odoo_shipment_id,
+                body.request_type, body.request_number, body.scac)
+        except IdentityConflict as exc:
+            raise HTTPException(409, str(exc)) from None
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @app.get('/v1/shipments/tracking/requests/{odoo_id}', dependencies=[Depends(authenticate)])
+    async def shipment_status(odoo_id: int, request: Request, company_id: int = Query(gt=0)):
+        if company_id != request.app.state.config.odoo_company_id:
+            raise HTTPException(409, 'Tracking service company does not match Odoo')
+        from .shipments import ShipmentStore
+        result = await ShipmentStore(request.app.state.store).status(odoo_id)
+        if result is None:
+            raise HTTPException(404, 'Shipment tracking operation not found')
         return result
 
     @app.get('/v1/updates', dependencies=[Depends(authenticate)])

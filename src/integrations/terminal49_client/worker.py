@@ -131,7 +131,7 @@ async def run(args):
     store = Store(config)
     if args.bootstrap:
         await store.bootstrap()
-        print('Terminal49 schema version 2 ready; shared lake manifest verified.')
+        print('Terminal49 schema version 3 ready; shared lake manifest verified.')
         return
     config.require_enabled(worker=True)
     if args.retry_notification:
@@ -160,8 +160,11 @@ async def run(args):
             worker = Worker(config, store, client)
             from .initiation import Initiator
             initiator = Initiator(store, client)
+            from .shipments import ShipmentStore, ShipmentInitiator
+            shipments = ShipmentInitiator(ShipmentStore(store), client)
             while not stop.is_set():
-                busy = await initiator.once()
+                busy = await shipments.once()
+                busy = await initiator.once() or busy
                 busy = await worker.once(conn) or busy
                 if args.once:
                     break

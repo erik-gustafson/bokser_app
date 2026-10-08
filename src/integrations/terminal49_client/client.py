@@ -81,6 +81,9 @@ class Terminal49Client:
     async def list_requests(self, number):
         return await self._list('tracking_requests', {'filter[request_number]': number})
 
+    async def list_shipments(self, number):
+        return await self._list('shipments', {'filter[number]': number})
+
     async def create_tracking_request(self, attributes):
         # Deliberately ONE attempt. POST is not proven provider-idempotent.
         async with self.lock:

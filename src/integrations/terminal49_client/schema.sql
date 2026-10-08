@@ -66,3 +66,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS t49_initiation_active_number
     ON terminal49.initiations(account, company_id, number)
     WHERE status IN ('QUEUED','SUBMITTING','PENDING');
 UPDATE terminal49.schema_version SET version=2 WHERE version=1;
+
+-- Version 3 adds shipment operations; existing inbox, mappings and feed remain intact.
+CREATE TABLE IF NOT EXISTS terminal49.shipment_initiations (
+ operation_id uuid PRIMARY KEY, account text NOT NULL, company_id integer NOT NULL CHECK(company_id>0),
+ odoo_shipment_id integer NOT NULL CHECK(odoo_shipment_id>0),
+ request_type text NOT NULL CHECK(request_type IN ('bill_of_lading','booking')),
+ request_number text NOT NULL, scac text NOT NULL DEFAULT '', status text NOT NULL DEFAULT 'QUEUED',
+ tracking_request_id uuid, shipment_id uuid, discovered jsonb, observed_at timestamptz, last_error text,
+ attempts integer NOT NULL DEFAULT 0, created_at timestamptz NOT NULL DEFAULT now(),
+ updated_at timestamptz NOT NULL DEFAULT now(), next_check_at timestamptz NOT NULL DEFAULT now(),
+ UNIQUE(account,company_id,odoo_shipment_id), UNIQUE(account,company_id,request_type,request_number),
+ UNIQUE(account,company_id,shipment_id)
+);
+CREATE INDEX IF NOT EXISTS t49_shipment_due ON terminal49.shipment_initiations(account,company_id,status,next_check_at);
+UPDATE terminal49.schema_version SET version=3 WHERE version=2;

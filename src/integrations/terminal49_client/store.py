@@ -33,7 +33,7 @@ class Store:
         async with self.connect() as conn:
             await conn.execute(Path(__file__).with_name('schema.sql').read_text())
             row = await (await conn.execute('SELECT version FROM terminal49.schema_version')).fetchone()
-            if row['version'] != 2:
+            if row['version'] != 3:
                 raise ValueError('Unsupported Terminal49 schema version')
             # Existing bokser_app migration must supply the shared lake manifest.
             await conn.execute('SELECT id FROM public.data_lake_files LIMIT 0')
@@ -170,7 +170,7 @@ class Store:
     async def health(self):
         async with self.connect() as conn:
             version = await (await conn.execute('SELECT version FROM terminal49.schema_version')).fetchone()
-            if version['version'] != 2:
+            if version['version'] != 3:
                 raise ValueError('Terminal49 schema upgrade is required')
             return {'ok': True}
 
@@ -241,3 +241,10 @@ class Store:
                 last_error=%s,updated_at=now(),next_check_at=now()+interval '1 minute'
                 WHERE operation_id=%s AND account=%s AND company_id=%s''',
                 (reason,oid,self.account,self.config.odoo_company_id))
+
+    async def shipment_submission(self, row):
+        async with self.connect() as conn:
+            return await (await conn.execute('''SELECT tracking_request_id, status FROM terminal49.shipment_initiations
+                WHERE account=%s AND company_id=%s AND request_type=%s AND request_number=%s
+                AND status IN ('SUBMITTING','PENDING','NEEDS_REVIEW','LINKED')''',
+                (self.account,self.config.odoo_company_id,row['request_type'],row['request_number']))).fetchone()
