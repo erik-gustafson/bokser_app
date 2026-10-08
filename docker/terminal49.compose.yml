@@ -1,0 +1,35 @@
+# Use alongside docker/docker-compose.yml; does not replace existing services.
+services:
+  terminal49_api:
+    build:
+      context: ..
+      dockerfile: docker/terminal49.Dockerfile
+    image: ${TERMINAL49_APP_IMAGE:-bokser_app_terminal49:latest}
+    entrypoint: ["uvicorn", "src.integrations.terminal49_client.api:app"]
+    command: ["--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+    env_file: ["${TERMINAL49_ENV_FILE:-terminal49.env}"]
+    ports: ["${TERMINAL49_BIND_IP:-127.0.0.1}:${TERMINAL49_HOST_PORT:-8011}:8000"]
+    volumes: ["${LAKE_HOST_PATH}:${LAKE_ROOT}:rw"]
+    networks: [db_net]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: local
+      options: {max-size: "10m", max-file: "3"}
+
+  terminal49_worker:
+    image: ${TERMINAL49_APP_IMAGE:-bokser_app_terminal49:latest}
+    entrypoint: ["python", "-m", "src.integrations.terminal49_client.worker"]
+    command: []
+    env_file: ["${TERMINAL49_ENV_FILE:-terminal49.env}"]
+    volumes: ["${LAKE_HOST_PATH}:${LAKE_ROOT}:rw"]
+    networks: [db_net]
+    restart: unless-stopped
+    stop_grace_period: 5m
+    logging:
+      driver: local
+      options: {max-size: "10m", max-file: "3"}

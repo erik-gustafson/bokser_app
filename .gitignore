@@ -1,6 +1,7 @@
 .tmp/
 .env
 docker/.env
+docker/terminal49.env
 .venv
 logs/
 downloads/
@@ -11,3 +12,4 @@ reporting_archive/
 secrets/
 gmail_credentials.json
 gmail_token.pickle
+
