@@ -1,0 +1,9 @@
+services:
+  terminal49_api:
+    networks:
+      - odoo_app_net
+
+networks:
+  odoo_app_net:
+    external: true
+    name: bokser_odoo_app_net
