@@ -3,6 +3,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 APP_DIR="/volume1/docker/bokser_app"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG="/var/log/git-deploy-prod.log"
 BRANCH_EXPECTED="main"
 BASE_COMPOSE="docker/docker-compose.yml"
@@ -37,11 +38,40 @@ run_compose() {
 }
 
 run_prod_compose() {
+  local args=(--env-file "$ENV_FILE" -f "$BASE_COMPOSE")
+  local overlays=(
+    docker/terminal49.compose.yml
+    docker/terminal49-gateway.compose.yml
+    docker/terminal49-odoo.compose.yml
+  )
+  local file
+  local found=0
+
   if [ -f "$SYNOLOGY_COMPOSE" ]; then
-    run_compose --env-file "$ENV_FILE" -f "$BASE_COMPOSE" -f "$SYNOLOGY_COMPOSE" "$@"
-  else
-    run_compose --env-file "$ENV_FILE" -f "$BASE_COMPOSE" "$@"
+    args+=(-f "$SYNOLOGY_COMPOSE")
   fi
+
+  for file in "${overlays[@]}"; do
+    if [ -f "$file" ]; then
+      found=$((found + 1))
+    fi
+  done
+
+  if [ "$found" -ne 0 ]; then
+    if [ "$found" -ne "${#overlays[@]}" ]; then
+      echo "ERROR: Terminal49 Compose overlays are incomplete." >&2
+      return 1
+    fi
+    if [ ! -f docker/terminal49.env ]; then
+      echo "ERROR: Missing docker/terminal49.env." >&2
+      return 1
+    fi
+    for file in "${overlays[@]}"; do
+      args+=(-f "$file")
+    done
+  fi
+
+  run_compose "${args[@]}" "$@"
 }
 
 DEPLOY=0
@@ -80,8 +110,7 @@ done
 checkout_rev() {
   local rev="$1"
   echo "Checking out '$rev' to $APP_DIR" | tee -a "$LOG"
-  git --work-tree="$APP_DIR" --git-dir="$PWD" checkout -f "$rev" 2>&1 | tee -a "$LOG"
-  git --work-tree="$APP_DIR" --git-dir="$PWD" clean -fd 2>&1 | tee -a "$LOG"
+  git --work-tree="$APP_DIR" --git-dir="$REPO_DIR" checkout -f "$rev" 2>&1 | tee -a "$LOG"
 }
 
 health_check() {
@@ -99,8 +128,8 @@ health_check() {
 
 deploy_current() {
   cd "$APP_DIR"
-  echo "Prod: down..." | tee -a "$LOG"
-  run_prod_compose down 2>&1 | tee -a "$LOG" || true
+  echo "Prod: validate Compose..." | tee -a "$LOG"
+  run_prod_compose config -q 2>&1 | tee -a "$LOG"
   echo "Prod: build..." | tee -a "$LOG"
   run_prod_compose build 2>&1 | tee -a "$LOG"
   echo "Prod: up..." | tee -a "$LOG"
