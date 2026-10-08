@@ -49,3 +49,20 @@ CREATE TABLE IF NOT EXISTS terminal49.feed (
     PRIMARY KEY(account, version)
 );
 CREATE INDEX IF NOT EXISTS t49_feed_company ON terminal49.feed(account, company_id, version);
+-- Version 2 is an additive upgrade from the deployed version 1.
+CREATE TABLE IF NOT EXISTS terminal49.initiations (
+    operation_id uuid PRIMARY KEY,
+    account text NOT NULL, company_id integer NOT NULL,
+    odoo_container_id integer NOT NULL CHECK(odoo_container_id > 0),
+    number text NOT NULL, request_type text NOT NULL, request_number text NOT NULL,
+    scac text NOT NULL DEFAULT '',
+    status text NOT NULL DEFAULT 'QUEUED',
+    tracking_request_id uuid, container_id uuid, last_error text,
+    created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
+    next_check_at timestamptz NOT NULL DEFAULT now(), attempts integer NOT NULL DEFAULT 0,
+    UNIQUE(account, company_id, odoo_container_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS t49_initiation_active_number
+    ON terminal49.initiations(account, company_id, number)
+    WHERE status IN ('QUEUED','SUBMITTING','PENDING');
+UPDATE terminal49.schema_version SET version=2 WHERE version=1;

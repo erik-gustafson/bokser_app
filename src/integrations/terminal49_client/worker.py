@@ -36,7 +36,7 @@ class Worker:
                     shipment_ids.add(resource['id'])
                 if resource['type'] == 'tracking_request':
                     request_ids.add(resource['id'])
-                for name in ('shipment', 'reference_object'):
+                for name in ('shipment', 'reference_object', 'tracked_object'):
                     for link in relationship(resource, name):
                         if link.get('type') == 'shipment':
                             shipment_ids.add(link['id'])
@@ -46,7 +46,7 @@ class Worker:
                 request = await self.client.get_tracking_request(rid)
                 ids.update(container_ids(request))
                 for resource in resources(request).values():
-                    shipment_ids.update(link['id'] for link in relationship(resource, 'shipment'))
+                    shipment_ids.update(link['id'] for link in relationship(resource, 'shipment') + relationship(resource, 'tracked_object'))
             for sid in sorted(shipment_ids):
                 ids.update(container_ids(await self.client.get_shipment(sid)))
         if not ids and event.startswith(('container.', 'shipment.')):
@@ -131,7 +131,7 @@ async def run(args):
     store = Store(config)
     if args.bootstrap:
         await store.bootstrap()
-        print('Terminal49 schema version 1 ready; shared lake manifest verified.')
+        print('Terminal49 schema version 2 ready; shared lake manifest verified.')
         return
     config.require_enabled(worker=True)
     if args.retry_notification:
@@ -158,8 +158,11 @@ async def run(args):
             client = Terminal49Client(http, config.api_key.get_secret_value(), store.archive_response,
                                       interval=config.request_interval_seconds)
             worker = Worker(config, store, client)
+            from .initiation import Initiator
+            initiator = Initiator(store, client)
             while not stop.is_set():
-                busy = await worker.once(conn)
+                busy = await initiator.once()
+                busy = await worker.once(conn) or busy
                 if args.once:
                     break
                 try:

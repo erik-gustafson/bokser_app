@@ -18,6 +18,16 @@ class MappingRequest(BaseModel):
     refresh: bool = False
 
 
+class InitiationRequest(BaseModel):
+    model_config = {'extra': 'forbid'}
+    company_id: int = Field(gt=0)
+    odoo_container_id: int = Field(gt=0)
+    number: str = Field(min_length=1, max_length=32)
+    request_type: str = 'container'
+    request_number: str = Field(default='', max_length=64)
+    scac: str = Field(default='', max_length=4)
+
+
 def create_app(config=None, store=None):
     # No configuration or network I/O at module import; helps isolated tests.
     @asynccontextmanager
@@ -82,6 +92,27 @@ def create_app(config=None, store=None):
         except IdentityConflict:
             raise HTTPException(409, 'Mapping identity conflict') from None
         return {'ok': True}
+
+    @app.post('/v1/tracking/requests', status_code=202, dependencies=[Depends(authenticate)])
+    async def initiate(body: InitiationRequest, request: Request):
+        if body.company_id != request.app.state.config.odoo_company_id:
+            raise HTTPException(409, 'Tracking service company does not match Odoo')
+        try:
+            return await request.app.state.store.initiate(body.odoo_container_id,
+                body.number, body.request_type, body.request_number, body.scac)
+        except IdentityConflict as exc:
+            raise HTTPException(409, str(exc)) from None
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+
+    @app.get('/v1/tracking/requests/{odoo_id}', dependencies=[Depends(authenticate)])
+    async def initiation_status(odoo_id: int, request: Request, company_id: int = Query(gt=0)):
+        if company_id != request.app.state.config.odoo_company_id:
+            raise HTTPException(409, 'Tracking service company does not match Odoo')
+        result = await request.app.state.store.initiation_status(odoo_id)
+        if result is None:
+            raise HTTPException(404, 'Tracking operation not found')
+        return result
 
     @app.get('/v1/updates', dependencies=[Depends(authenticate)])
     async def updates(request: Request, after: int = Query(default=0, ge=0),

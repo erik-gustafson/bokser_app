@@ -33,7 +33,7 @@ class Store:
         async with self.connect() as conn:
             await conn.execute(Path(__file__).with_name('schema.sql').read_text())
             row = await (await conn.execute('SELECT version FROM terminal49.schema_version')).fetchone()
-            if row['version'] != 1:
+            if row['version'] != 2:
                 raise ValueError('Unsupported Terminal49 schema version')
             # Existing bokser_app migration must supply the shared lake manifest.
             await conn.execute('SELECT id FROM public.data_lake_files LIMIT 0')
@@ -170,7 +170,9 @@ class Store:
     async def health(self):
         async with self.connect() as conn:
             version = await (await conn.execute('SELECT version FROM terminal49.schema_version')).fetchone()
-            return {'ok': version['version'] == 1}
+            if version['version'] != 2:
+                raise ValueError('Terminal49 schema upgrade is required')
+            return {'ok': True}
 
     async def status(self):
         async with self.connect() as conn:
@@ -180,3 +182,62 @@ class Store:
                 FROM terminal49.mappings WHERE account=%s AND company_id=%s AND last_error IS NOT NULL''',
                 (self.account, self.config.odoo_company_id))).fetchall()
         return {'notifications': notifications, 'mapping_errors': errors}
+
+    async def initiate(self, odoo_id, number, request_type, request_number, scac):
+        from uuid import uuid4
+        from .initiation import validate_input
+        number, request_type, request_number, scac = validate_input(number, request_type, request_number, scac)
+        company = self.config.odoo_company_id
+        async with self.connect() as conn:
+            await conn.execute('SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))',
+                ('terminal49:initiate:' + self.account + ':' + str(company),))
+            existing = await (await conn.execute('''SELECT * FROM terminal49.initiations
+                WHERE account=%s AND company_id=%s AND odoo_container_id=%s''', (self.account, company, odoo_id))).fetchone()
+            if existing:
+                if (existing['number'], existing['request_type'], existing['request_number'], existing['scac']) != (number, request_type, request_number, scac):
+                    raise IdentityConflict('An existing tracking operation has different identifiers. Review it before changing the journey.')
+                return self.initiation_result(existing)
+            other = await (await conn.execute('''SELECT operation_id FROM terminal49.initiations
+                WHERE account=%s AND company_id=%s AND number=%s AND status IN ('QUEUED','SUBMITTING','PENDING')''', (self.account, company, number))).fetchone()
+            if other:
+                raise IdentityConflict('Another Odoo record has a pending operation for this container.')
+            row = await (await conn.execute('''INSERT INTO terminal49.initiations
+                (operation_id,account,company_id,odoo_container_id,number,request_type,request_number,scac)
+                VALUES(%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *''',
+                (str(uuid4()), self.account, company, odoo_id, number, request_type, request_number, scac))).fetchone()
+            return self.initiation_result(row)
+
+    @staticmethod
+    def initiation_result(row):
+        return {k: str(row[k]) if k in ('operation_id', 'tracking_request_id', 'container_id') and row[k] else row[k]
+                for k in ('operation_id','company_id','odoo_container_id','number','request_type','request_number','scac','status','tracking_request_id','container_id','last_error')}
+
+    async def initiation_status(self, odoo_id):
+        async with self.connect() as conn:
+            row = await (await conn.execute('''SELECT * FROM terminal49.initiations
+                WHERE account=%s AND company_id=%s AND odoo_container_id=%s''',
+                (self.account,self.config.odoo_company_id,odoo_id))).fetchone()
+            return self.initiation_result(row) if row else None
+
+    async def next_initiation(self):
+        async with self.connect() as conn:
+            return await (await conn.execute('''SELECT * FROM terminal49.initiations
+                WHERE account=%s AND company_id=%s AND status IN ('QUEUED','SUBMITTING','PENDING')
+                AND next_check_at<=now() ORDER BY next_check_at LIMIT 1''',
+                (self.account,self.config.odoo_company_id))).fetchone()
+
+    async def update_initiation(self, oid, status, *, tracking_request_id=None, container_id=None, error=None):
+        async with self.connect() as conn:
+            await conn.execute('''UPDATE terminal49.initiations SET status=%s,
+                tracking_request_id=COALESCE(%s,tracking_request_id),container_id=COALESCE(%s,container_id),
+                last_error=%s,updated_at=now(),attempts=0,next_check_at=now()+interval '30 seconds'
+                WHERE operation_id=%s AND account=%s AND company_id=%s''',
+                (status,tracking_request_id,container_id,error,oid,self.account,self.config.odoo_company_id))
+
+    async def defer_initiation(self, oid, reason):
+        async with self.connect() as conn:
+            await conn.execute('''UPDATE terminal49.initiations SET attempts=attempts+1,
+                status=CASE WHEN attempts>=7 THEN 'NEEDS_REVIEW' ELSE status END,
+                last_error=%s,updated_at=now(),next_check_at=now()+interval '1 minute'
+                WHERE operation_id=%s AND account=%s AND company_id=%s''',
+                (reason,oid,self.account,self.config.odoo_company_id))

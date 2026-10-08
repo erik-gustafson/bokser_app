@@ -31,7 +31,7 @@ class Terminal49Client:
         return await self._get(f'shipments/{sid}', {'include': 'containers'})
 
     async def get_tracking_request(self, request_id: str) -> dict:
-        return await self._get(f'tracking_requests/{UUID(request_id)}', {'include': 'shipment,shipment.containers'})
+        return await self._get(f'tracking_requests/{UUID(request_id)}', {'include': 'tracked_object'})
 
     async def get_events(self, container_id: str) -> dict:
         cid = str(UUID(container_id))
@@ -61,3 +61,38 @@ class Terminal49Client:
             delay = min(float(retry_after), 60.0) if retry_after.isdigit() else 2 ** attempt
             await asyncio.sleep(delay)
         raise RuntimeError('Unreachable')
+
+    async def _list(self, path, params):
+        data, included = [], []
+        # Reconstruct fixed-origin requests; never follow provider pagination URLs.
+        for page in range(1, 101):
+            doc = await self._get(path, dict(params, **{'page[number]': page, 'page[size]': 50}))
+            if not isinstance(doc.get('data'), list):
+                raise ValueError('Invalid provider list response')
+            data.extend(doc['data'])
+            included.extend(doc.get('included', []))
+            if not doc.get('links', {}).get('next'):
+                return {'data': data, 'included': included}
+        raise ValueError('Lookup exceeds pagination limit; operator review required')
+
+    async def list_containers(self, number):
+        return await self._list('containers', {'filter[number]': number, 'include': 'shipment'})
+
+    async def list_requests(self, number):
+        return await self._list('tracking_requests', {'filter[request_number]': number})
+
+    async def create_tracking_request(self, attributes):
+        # Deliberately ONE attempt. POST is not proven provider-idempotent.
+        async with self.lock:
+            await asyncio.sleep(max(0.0, self.next_at - time.monotonic()))
+            self.next_at = time.monotonic() + self.interval
+            body = {'data': {'type': 'tracking_request', 'attributes': attributes}}
+            from json import dumps
+            await self.sink(dumps(body).encode(), {'path': 'tracking_requests', 'method': 'POST', 'kind': 'request'})
+            response = await self.http.post('https://api.terminal49.com/v2/tracking_requests',
+                json=body, headers={'Authorization': 'Token ' + self.api_key,
+                                   'Accept': 'application/vnd.api+json'},
+                timeout=30.0, follow_redirects=False)
+            await self.sink(response.content, {'path': 'tracking_requests', 'method': 'POST', 'status_code': response.status_code})
+            response.raise_for_status()
+            return response.json()
