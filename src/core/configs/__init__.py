@@ -6,8 +6,10 @@ from .httpx import HttpxSettings
 from .sos import SosSettings
 from .productiv import ProductivSettings
 from .acenda import AcendaSettings
+from .amazon import AmazonSettings
 from .bokser_api import BokserAPISettings
 from .shipment_processing import ShipmentProcessingSettings
+from .ksp_gateway import KSPGatewaySettings
 
 __all__ = [
     "AppBaseSettings",
@@ -18,6 +20,8 @@ __all__ = [
     "SosSettings",
     "ProductivSettings",
     "AcendaSettings",
+    "AmazonSettings",
     "BokserAPISettings",
     "ShipmentProcessingSettings",
+    "KSPGatewaySettings",
 ]

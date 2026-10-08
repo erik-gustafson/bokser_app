@@ -56,6 +56,15 @@ def build_runtime(http_client: httpx.AsyncClient) -> WorkerRuntime:
 
 def register_jobs(scheduler: AsyncIOScheduler, runtime: WorkerRuntime) -> None:
 
+    if settings.ksp_gateway_job_enabled:
+        from src.worker.jobs.push_data.odoo.ksp_gateway import build_ksp_gateway_job
+        ksp_job = build_ksp_gateway_job(settings)
+        scheduler.add_job(
+            ksp_job.tick, "interval", minutes=settings.ksp_gateway_interval_minutes,
+            id="ksp_gateway_odoo", max_instances=1, coalesce=True,
+            misfire_grace_time=60,
+        )
+
     scheduler.add_job(
         sos_load_to_db,
         "interval",

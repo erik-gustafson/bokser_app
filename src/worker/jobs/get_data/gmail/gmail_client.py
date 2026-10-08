@@ -3,7 +3,10 @@ from __future__ import annotations
 import base64
 import logging
 import os
-import pickle
+import json
+from pathlib import Path
+
+from src.storage.private_json import read_private_json, write_private_json
 
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -29,11 +32,11 @@ SCOPES = [
 #
 # Local example:
 # GMAIL_CREDENTIALS_PATH=C:\Users\erik\Code\bokser_app\secrets\google\gmail_credentials.json
-# GMAIL_TOKEN_PATH=C:\Users\erik\Code\bokser_app\secrets\google\gmail_token.pickle
+# GMAIL_TOKEN_PATH=C:\Users\erik\Code\bokser_app\secrets\google\gmail_token.json
 #
 # Docker example:
 # GMAIL_CREDENTIALS_PATH=/run/secrets/gmail_credentials.json
-# GMAIL_TOKEN_PATH=/run/secrets/gmail_token.pickle
+# GMAIL_TOKEN_PATH=/run/secrets/gmail_token.json
 
 
 MAX_EMAILS_PER_REQUEST = 500
@@ -57,7 +60,7 @@ class GmailClient:
         self.token_file = (
             token_file
             or os.environ.get("GMAIL_TOKEN_PATH")
-            or "credentials/gmail_api/gmail_token.pickle"
+            or "credentials/gmail_api/gmail_token.json"
         )
 
         self.service = None
@@ -69,7 +72,7 @@ class GmailClient:
 
     def _get_credentials(self) -> Credentials:
         """
-        Load Gmail OAuth credentials from the pre-generated token pickle.
+        Load Gmail OAuth credentials from the pre-generated authorized-user JSON token.
 
         If the access token has expired and a refresh token is available,
         refresh the credentials and persist the updated token.
@@ -84,8 +87,8 @@ class GmailClient:
             )
 
         try:
-            with open(self.token_file, "rb") as token:
-                creds = pickle.load(token)
+            info = read_private_json(Path(self.token_file))
+            creds = Credentials.from_authorized_user_info(info)
 
         except Exception as exc:
             raise RuntimeError(
@@ -136,8 +139,9 @@ class GmailClient:
 
             # Persist the refreshed credential state.
             try:
-                with open(self.token_file, "wb") as token:
-                    pickle.dump(creds, token)
+                write_private_json(
+                    Path(self.token_file), json.loads(creds.to_json()), atomic=False
+                )
 
             except Exception as exc:
                 raise RuntimeError(

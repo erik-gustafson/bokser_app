@@ -13,8 +13,10 @@ class Settings(
     SosSettings,
     ProductivSettings,
     AcendaSettings,
+    AmazonSettings,
     BokserAPISettings,
     ShipmentProcessingSettings,
+    KSPGatewaySettings,
 ):
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),

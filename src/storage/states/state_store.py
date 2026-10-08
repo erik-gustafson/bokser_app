@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 from typing import Any
 from collections.abc import Mapping
+from src.storage.private_json import read_private_json, write_private_json, private_parent
 
 
 class StateStore:
@@ -25,16 +26,13 @@ class StateStore:
             if self._loaded:
                 return
 
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-
-            if self.path.exists():
-                text = await asyncio.to_thread(
-                    self.path.read_text,
-                    encoding="utf-8",
-                )
-                self._state = json.loads(text) if text.strip() else {}
-            else:
+            await asyncio.to_thread(private_parent, self.path)
+            try:
+                self._state = await asyncio.to_thread(read_private_json, self.path)
+            except FileNotFoundError:
                 self._state = {}
+            if not isinstance(self._state, dict):
+                raise ValueError("State JSON must contain an object")
 
             self._loaded = True
 
@@ -74,18 +72,7 @@ class StateStore:
         Caller must hold self._lock.
         Saves the current in-memory cache to disk.
         """
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-
-        tmp_path = self.path.with_suffix(".json.tmp")
-        text = json.dumps(self._state, indent=2, sort_keys=True)
-
-        await asyncio.to_thread(
-            tmp_path.write_text,
-            text,
-            encoding="utf-8",
-        )
-
-        await asyncio.to_thread(tmp_path.replace, self.path)
+        await asyncio.to_thread(write_private_json, self.path, self._state)
 
     def deep_merge_dict(self, target: dict[str, Any], updates: dict[str, Any]) -> None:
         """
@@ -164,7 +151,11 @@ class StatePaths:
         if root is not None:
             self.root = Path(root)
         else:
-            self.root = Path(os.getenv("LAKE_ROOT", "/tmp/bokser_app_state"))
+            self.root = Path(
+                os.environ.get("BOKSER_STATE_ROOT")
+                or os.environ.get("LAKE_ROOT")
+                or str(Path.home() / ".local" / "state" / "bokser_app")
+            )
 
     @property
     def sos_state(self) -> Path:

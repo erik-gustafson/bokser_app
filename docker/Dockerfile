@@ -10,6 +10,7 @@ WORKDIR /app
 
 RUN apt-get update \
     && apt-get upgrade -y \
+    && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' liblzma5)" ge '5.8.1-1+deb13u2' \
     && rm -rf /var/lib/apt/lists/*
 
 COPY docker/requirements.txt /app/requirements.txt
