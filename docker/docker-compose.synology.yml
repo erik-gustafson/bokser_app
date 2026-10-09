@@ -22,15 +22,27 @@ services:
         tag: "{{.Name}}"
 
   bokser_app_worker:
+    networks: [db_net, ksp_odoo_net]
+    command: ["sh", "-ec", "set -a; . /app/ksp_gateway/ksp-preview.env; set +a; exec python -m src.worker.worker"]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     environment:
       BOKSER_STATE_ROOT: /app/private_state
+      SSL_CERT_FILE: /app/ksp_gateway/ca-bundle.crt
     volumes:
       - ${BOKSER_STATE_HOST_PATH:?Set the private state host path before deployment}:/app/private_state:rw
+      - ${BOKSER_KSP_CONFIG_HOST_PATH:?Set the private KSP configuration path before deployment}/ksp-preview.runtime.env:/app/ksp_gateway/ksp-preview.env:ro
+      - ${BOKSER_KSP_CONFIG_HOST_PATH:?Set the private KSP configuration path before deployment}/journal:/app/ksp_gateway/journal:rw
+      - ${BOKSER_KSP_CONFIG_HOST_PATH:?Set the private KSP configuration path before deployment}/pack_rules.json:/app/ksp_gateway/pack_rules.json:ro
+      - ${BOKSER_KSP_CONFIG_HOST_PATH:?Set the private KSP configuration path before deployment}/ca-bundle.crt:/app/ksp_gateway/ca-bundle.crt:ro
     logging:
       driver: syslog
       options:
         syslog-address: tcp://127.0.0.1:5514
         syslog-format: rfc3164
         tag: "{{.Name}}"
+
+networks:
+  ksp_odoo_net:
+    external: true
+    name: bokser_amazon_odoo_net
