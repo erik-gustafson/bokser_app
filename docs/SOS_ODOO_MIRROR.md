@@ -19,7 +19,9 @@ Name/email matching is deliberately not an identity rule. A customer and vendor
 with the same numeric ID have separate bindings and separate partners.
 Adoption/deduplication of existing Odoo partners needs a reviewed mapping before use
 on a real dataset. It currently creates new partners; it does not adopt existing ones.
-Only name, email, phone, mobile and website transfer. Customer/vendor rank and
+Only name, email, phone and website transfer. Odoo 19 has no native mobile field;
+a mobile-only source number maps to phone. Two distinct phone/mobile numbers
+fail with multiple_phone_numbers_pending until an alternate-number mapping is reviewed. Customer/vendor rank and
 company are set by the server. Addresses, terms, currencies, hierarchy, archival,
 custom fields and complete master parity remain pending. Raw JSON, notes, portal
 passwords and payment credentials are excluded by an explicit field allowlist.
@@ -99,19 +101,43 @@ in errors. A rejected/uncertain request is recoverable by replaying the same fil
 
 ## Verification and next steps
 
-Local: 10 backend unittest cases pass (contract, batch validation, mocked HTTPS);
-4 Odoo pure-policy unittest cases pass. Python AST, XML parsing and addon manifest
-reference checks pass. Existing offline Odoo framework/contract/allocation checks
-are also run at this checkpoint; consult session completion notes for results.
-These checks do not prove ORM, record-rule, view-install or actual API behavior.
-Eleven Odoo TransactionCase tests are supplied in addons/bokser_sos_mirror/tests but
-have NOT run. No live SOS calls, Odoo JSON/2 calls, deployment, installation,
-activation, shared database migration or runtime acceptance occurred.
+Local: 11 backend unittest cases and 4 Odoo pure-policy cases pass. The new addon
+static checks and existing framework/contract/allocation checks passed.
+Runtime: installed in a disposable Docker Desktop Odoo 19.0-20260908 / PostgreSQL
+15.19 database, bokser_sos_mirror_local. All eleven Odoo TransactionCase tests
+pass. Real certificate-verified HTTPS JSON/2 checks pass for create, duplicate,
+update, stale replay, same-time conflict, local-edit conflict, company restriction,
+vendor creation, concurrent replay, disabled gate and two-way gate. The backend
+client ran inside the isolated container through a temporary TLS proxy; this was
+not a browser/UI acceptance check or a production deployment test.
 
-Exact next step: provision a disposable Odoo 19 database with account and rpc,
-install bokser_sos_mirror there and run its tagged post-install ORM tests. Fix
-any registry/ACL/view failures in these feature worktrees before merging. Then
-verify a create/replay/update/local-conflict through JSON/2 using synthetic data.
+Runtime testing found/fixed two issues: Odoo 19 has no native mobile field; and
+SELECT FOR UPDATE alone leaves a waiting request's REPEATABLE READ snapshot stale.
+The server now touches the account audit row to trigger Odoo's serialization retry
+with a fresh snapshot. Concurrent identical requests return created and duplicate
+with one native partner/binding. Eleven ORM tests were rerun after this correction.
+
+The backend scripts/check_sos_mirror_runtime.py is a repeatable synthetic HTTPS
+regression, requiring --disposable and a bokser_sos_mirror_local-prefixed database.
+Its extra private env vars are SOS_MIRROR_ODOO_ACCOUNT, SOS_MIRROR_ODOO_COMPANY and
+optional SOS_MIRROR_TLS_CA. It creates synthetic records; an owner must first
+provision/enable the disposable account. Disabled/two-way gates were separately
+verified by the isolated harness. No live SOS calls, NAS changes, shared database
+migrations, production activation or production runtime acceptance occurred.
+Temporary API credentials were revoked and disposable services stopped afterward.
+
+The local harness/evidence is outside Git in
+C:/Users/erik/Downloads/Bokser_Production_Baseline/mirror-runtime-20261009.
+Its PostgreSQL container preserves the synthetic test DB while stopped; there is
+no production data. Do not copy keys or database/runtime bundles into Git. Recreate
+an expiring API key and TLS certificate before repeating HTTPS checks.
+For ORM validation run Odoo with -d bokser_sos_mirror_local -u bokser_sos_mirror
+--test-enable --test-tags /bokser_sos_mirror --stop-after-init --without-demo=True.
+Use -i instead of -u only for an initial install; -i on an already installed module
+does not rerun the suite. Check that eleven tests actually ran, not just exit code.
+
+Exact next step: confirm SOS customer/vendor API shapes, identity/version semantics
+and source account provenance, then implement safe opt-in master capture.
 Next implement opt-in customer/vendor capture using the existing SOSClient and
 RawPayloadWriter, with complete-page validation, source provenance and independent
 consumer progress; extend master fields/dependency mappings. Then add native draft

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 
-FIELDS = ("name", "email", "phone", "mobile", "website")
+FIELDS = ("name", "email", "phone", "website")
 ENTITIES = ("customer", "vendor")
 
 
@@ -56,7 +56,13 @@ def normalize(entity, record, observed_at):
     if type(identifier) is not int or identifier <= 0:
         raise ValueError("invalid_source_id")
     # Allowlist only. Passwords, payment tokens, raw JSON and notes never cross.
+    phone, mobile = record.get("phone"), record.get("mobile")
+    if any(v is not None and not isinstance(v, str) for v in (phone, mobile)):
+        raise ValueError("invalid_partner_value")
+    if phone and mobile and phone != mobile:
+        raise ValueError("multiple_phone_numbers_pending")
     values = {field: ("" if record.get(field) is None else record[field]) for field in FIELDS}
+    values["phone"] = phone or mobile or ""
     payload = {"schema_version": 1, "entity": entity, "source_id": str(identifier),
                "observed_at": observed_at, "values": values}
     validate(payload)

@@ -18,6 +18,13 @@ class ContractTests(unittest.TestCase):
         self.assertNotIn("excluded", json.dumps(p))
         self.assertEqual(p["source_id"], "1")
 
+    def test_mobile_only_maps_to_native_phone_and_dual_numbers_block(self):
+        payload = normalize("customer", {"id": 1, "name": "X", "mobile": "555-0100"}, T)
+        self.assertEqual(payload["values"]["phone"], "555-0100")
+        self.assertNotIn("mobile", payload["values"])
+        with self.assertRaisesRegex(ValueError, "multiple_phone_numbers_pending"):
+            normalize("customer", {"id": 1, "name": "X", "phone": "555-0100", "mobile": "555-0101"}, T)
+
     def test_id_and_value_validation(self):
         for identifier in (True, "1", 0, -1):
             with self.assertRaises(ValueError):
