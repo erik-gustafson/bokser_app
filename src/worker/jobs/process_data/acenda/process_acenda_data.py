@@ -32,6 +32,7 @@ from src.database.utils.formatter_tools import (
     as_str,
     as_float,
     as_int,
+    as_decimal,
     require_datetime,
     require_positive_int,
 )
@@ -527,6 +528,19 @@ class AcendaPayloadMapper:
         delivery = data.get("delivery_information") or data.get("delivery_info") or {}
 
         advice = AcendaShipAdviceHeaders(
+            currency=data.get("currency") or data.get("currency_code") or None,
+            status=as_str(data.get("status")) if data.get("status") is not None else None,
+            external_order_id=as_str(data.get("external_order_id")) if data.get("external_order_id") is not None else None,
+            purchase_order=as_str(data.get("purchase_order")) if data.get("purchase_order") is not None else None,
+            sales_channel_id=as_int(data.get("sales_channel_id")) if data.get("sales_channel_id") is not None else None,
+            sales_channel_name=as_str(data.get("sales_channel_name")) if data.get("sales_channel_name") is not None else None,
+            sales_channel_type=as_str(data.get("sales_channel_type")) if data.get("sales_channel_type") is not None else None,
+            sales_channel_subtype=as_str(data.get("sales_channel_subtype")) if data.get("sales_channel_subtype") is not None else None,
+            sales_channel_country=as_str(data.get("sales_channel_country")) if data.get("sales_channel_country") is not None else None,
+            shipping_method=as_str(data.get("shipping_method")) if data.get("shipping_method") is not None else None,
+            shipping_code=as_str(data.get("shipping_code")) if data.get("shipping_code") is not None else None,
+            requested_ship_date=parse_dt(data.get("requested_ship_date")),
+            requested_delivery_date=parse_dt(data.get("requested_delivery_date")),
             id=as_int(data.get("id")),
             created_at=parse_dt(data.get("created_at")),
             updated_at=parse_dt(data.get("updated_at")),
@@ -557,6 +571,25 @@ class AcendaPayloadMapper:
 
     def map_ship_advice_item(self, data: dict[str, Any]) -> AcendaShipAdviceItems:
         return AcendaShipAdviceItems(
+            line_id=as_str(data.get("line_id")) if data.get("line_id") is not None else None,
+            sku=as_str(data.get("sku")) if data.get("sku") is not None else None,
+            external_sku=as_str(data.get("external_sku")) if data.get("external_sku") is not None else None,
+            currency=data.get("currency") or data.get("currency_code") or None,
+            status=as_str(data.get("status")) if data.get("status") is not None else None,
+            quantity=as_int(data.get("quantity")) if data.get("quantity") is not None else None,
+            quantity_fulfilled=as_int(data.get("quantity_fulfilled")) if data.get("quantity_fulfilled") is not None else None,
+            quantity_canceled=as_int(data.get("quantity_canceled")) if data.get("quantity_canceled") is not None else None,
+            total_handling_price=as_decimal(data.get("total_handling_price")),
+            other_fees=as_decimal(data.get("other_fees")),
+            unit_price=as_decimal(data.get("unit_price")),
+            total_item_price=as_decimal(data.get("total_item_price")),
+            total_item_discount=as_decimal(data.get("total_item_discount")),
+            total_shipping_price=as_decimal(data.get("total_shipping_price")),
+            total_shipping_discount=as_decimal(data.get("total_shipping_discount")),
+            total_tax_price=as_decimal(data.get("total_tax_price")),
+            total_price=as_decimal(data.get("total_price")),
+            kit_items=data.get("kit_items"),
+            discounts=data.get("discounts"),
             id=as_int(data.get("id")),
             inventory_detail_id=as_int(data.get("inventory_detail_id")),
             order_item_id=as_int(data.get("order_item_id")),

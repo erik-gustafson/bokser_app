@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, JSON, Numeric, String, Text
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from src.database.database import Base
@@ -390,6 +391,20 @@ class AcendaShipAdviceHeaders(Base):
     __tablename__ = "ship_advice_headers"
     __table_args__ = {"schema": ACENDA_SCHEMA}
 
+    currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    status: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    external_order_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    purchase_order: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sales_channel_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sales_channel_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    sales_channel_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    sales_channel_subtype: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    sales_channel_country: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    shipping_method: Mapped[str | None] = mapped_column(Text, nullable=True)
+    shipping_code: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    requested_ship_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    requested_delivery_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
     order_id: Mapped[int] = mapped_column(
@@ -474,6 +489,26 @@ class AcendaShipAdviceHeaders(Base):
 class AcendaShipAdviceItems(Base):
     __tablename__ = "ship_advice_items"
     __table_args__ = {"schema": ACENDA_SCHEMA}
+
+    line_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sku: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    external_sku: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    status: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    quantity: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    quantity_fulfilled: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    quantity_canceled: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    total_handling_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
+    other_fees: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
+    unit_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
+    total_item_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
+    total_item_discount: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
+    total_shipping_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
+    total_shipping_discount: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
+    total_tax_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
+    total_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
+    kit_items: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
+    discounts: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 

@@ -1,0 +1,78 @@
+"""Preserve Ship Advice import fields. NULL means not backfilled/unknown."""
+from alembic import op
+import sqlalchemy as sa
+
+revision = "ab72e1c69043"
+down_revision = "f3a91c2d7e60"
+branch_labels = None
+depends_on = None
+
+
+def upgrade():
+    op.add_column("ship_advice_headers", sa.Column("currency", sa.String(3), nullable=True), schema="acenda")
+    op.add_column("ship_advice_items", sa.Column("currency", sa.String(3), nullable=True), schema="acenda")
+    op.add_column("ship_advice_items", sa.Column("total_handling_price", sa.Numeric(18, 6), nullable=True), schema="acenda")
+    op.add_column("ship_advice_items", sa.Column("other_fees", sa.Numeric(18, 6), nullable=True), schema="acenda")
+    op.add_column("ship_advice_headers", sa.Column("status", sa.String(64), nullable=True), schema="acenda")
+    op.add_column("ship_advice_headers", sa.Column("external_order_id", sa.Text(), nullable=True), schema="acenda")
+    op.add_column("ship_advice_headers", sa.Column("purchase_order", sa.Text(), nullable=True), schema="acenda")
+    op.add_column("ship_advice_headers", sa.Column("sales_channel_id", sa.Integer(), nullable=True), schema="acenda")
+    op.add_column("ship_advice_headers", sa.Column("sales_channel_name", sa.String(128), nullable=True), schema="acenda")
+    op.add_column("ship_advice_headers", sa.Column("sales_channel_type", sa.String(128), nullable=True), schema="acenda")
+    op.add_column("ship_advice_headers", sa.Column("sales_channel_subtype", sa.String(128), nullable=True), schema="acenda")
+    op.add_column("ship_advice_headers", sa.Column("sales_channel_country", sa.String(64), nullable=True), schema="acenda")
+    op.add_column("ship_advice_headers", sa.Column("shipping_method", sa.Text(), nullable=True), schema="acenda")
+    op.add_column("ship_advice_headers", sa.Column("shipping_code", sa.String(128), nullable=True), schema="acenda")
+    op.add_column("ship_advice_headers", sa.Column("requested_ship_date", sa.DateTime(timezone=True), nullable=True), schema="acenda")
+    op.add_column("ship_advice_headers", sa.Column("requested_delivery_date", sa.DateTime(timezone=True), nullable=True), schema="acenda")
+    op.add_column("ship_advice_items", sa.Column("line_id", sa.Text(), nullable=True), schema="acenda")
+    op.add_column("ship_advice_items", sa.Column("sku", sa.String(128), nullable=True), schema="acenda")
+    op.add_column("ship_advice_items", sa.Column("external_sku", sa.String(128), nullable=True), schema="acenda")
+    op.add_column("ship_advice_items", sa.Column("status", sa.String(64), nullable=True), schema="acenda")
+    op.add_column("ship_advice_items", sa.Column("quantity", sa.Integer(), nullable=True), schema="acenda")
+    op.add_column("ship_advice_items", sa.Column("quantity_fulfilled", sa.Integer(), nullable=True), schema="acenda")
+    op.add_column("ship_advice_items", sa.Column("quantity_canceled", sa.Integer(), nullable=True), schema="acenda")
+    op.add_column("ship_advice_items", sa.Column("unit_price", sa.Numeric(18, 6), nullable=True), schema="acenda")
+    op.add_column("ship_advice_items", sa.Column("total_item_price", sa.Numeric(18, 6), nullable=True), schema="acenda")
+    op.add_column("ship_advice_items", sa.Column("total_item_discount", sa.Numeric(18, 6), nullable=True), schema="acenda")
+    op.add_column("ship_advice_items", sa.Column("total_shipping_price", sa.Numeric(18, 6), nullable=True), schema="acenda")
+    op.add_column("ship_advice_items", sa.Column("total_shipping_discount", sa.Numeric(18, 6), nullable=True), schema="acenda")
+    op.add_column("ship_advice_items", sa.Column("total_tax_price", sa.Numeric(18, 6), nullable=True), schema="acenda")
+    op.add_column("ship_advice_items", sa.Column("total_price", sa.Numeric(18, 6), nullable=True), schema="acenda")
+    op.add_column("ship_advice_items", sa.Column("kit_items", sa.JSON(), nullable=True), schema="acenda")
+    op.add_column("ship_advice_items", sa.Column("discounts", sa.JSON(), nullable=True), schema="acenda")
+
+
+def downgrade():
+    op.drop_column("ship_advice_items", "discounts", schema="acenda")
+    op.drop_column("ship_advice_items", "kit_items", schema="acenda")
+    op.drop_column("ship_advice_items", "total_price", schema="acenda")
+    op.drop_column("ship_advice_items", "total_tax_price", schema="acenda")
+    op.drop_column("ship_advice_items", "total_shipping_discount", schema="acenda")
+    op.drop_column("ship_advice_items", "total_shipping_price", schema="acenda")
+    op.drop_column("ship_advice_items", "total_item_discount", schema="acenda")
+    op.drop_column("ship_advice_items", "total_item_price", schema="acenda")
+    op.drop_column("ship_advice_items", "unit_price", schema="acenda")
+    op.drop_column("ship_advice_items", "quantity_canceled", schema="acenda")
+    op.drop_column("ship_advice_items", "quantity_fulfilled", schema="acenda")
+    op.drop_column("ship_advice_items", "quantity", schema="acenda")
+    op.drop_column("ship_advice_items", "status", schema="acenda")
+    op.drop_column("ship_advice_items", "external_sku", schema="acenda")
+    op.drop_column("ship_advice_items", "sku", schema="acenda")
+    op.drop_column("ship_advice_items", "line_id", schema="acenda")
+    op.drop_column("ship_advice_headers", "requested_delivery_date", schema="acenda")
+    op.drop_column("ship_advice_headers", "requested_ship_date", schema="acenda")
+    op.drop_column("ship_advice_headers", "shipping_code", schema="acenda")
+    op.drop_column("ship_advice_headers", "shipping_method", schema="acenda")
+    op.drop_column("ship_advice_headers", "sales_channel_country", schema="acenda")
+    op.drop_column("ship_advice_headers", "sales_channel_subtype", schema="acenda")
+    op.drop_column("ship_advice_headers", "sales_channel_type", schema="acenda")
+    op.drop_column("ship_advice_headers", "sales_channel_name", schema="acenda")
+    op.drop_column("ship_advice_headers", "sales_channel_id", schema="acenda")
+    op.drop_column("ship_advice_headers", "purchase_order", schema="acenda")
+    op.drop_column("ship_advice_headers", "external_order_id", schema="acenda")
+    op.drop_column("ship_advice_headers", "status", schema="acenda")
+    op.drop_column("ship_advice_items", "other_fees", schema="acenda")
+    op.drop_column("ship_advice_items", "total_handling_price", schema="acenda")
+    op.drop_column("ship_advice_items", "currency", schema="acenda")
+    op.drop_column("ship_advice_headers", "currency", schema="acenda")

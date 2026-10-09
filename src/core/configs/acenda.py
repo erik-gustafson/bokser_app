@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 from datetime import date, datetime, timezone, timedelta
@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, ClassVar, Tuple
 from pathlib import Path
 from .base import AppBaseSettings
+from pydantic import Field
 from src.storage.states.state_store import acenda_state
 
 
@@ -21,6 +22,7 @@ class AcendaEndpoint:
 
 # fmt: off
 class AcendaSettings(AppBaseSettings):
+    acenda_order_currency: str = Field(default="USD", pattern=r"^[A-Z]{3}$")
     acenda_api_url: str = "https://api.acenda.io/v1"
     acenda_token_url: str = "https://login.acenda.io/auth/realms/acenda/protocol/openid-connect/token"
     acenda_client_id: str = ""
