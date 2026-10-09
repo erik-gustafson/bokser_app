@@ -14,7 +14,12 @@ class KSPGatewaySettings(AppBaseSettings):
     ksp_gateway_enable_submissions: bool = False
     ksp_gateway_enable_shipments: bool = False
     ksp_gateway_confirm_tracking_identity: bool = False
-    # Explicit synthetic delivery allowlist until generic dispatch is installed.
+    # Explicit picking mode remains available; discovery requires a separate opt-in.
+    ksp_gateway_discovery_enabled: bool = False
+    ksp_gateway_discovery_preview_only: bool = True
+    ksp_gateway_company_ids: list[int] = Field(default_factory=list)
+    ksp_gateway_warehouse_ids: list[int] = Field(default_factory=list)
+    ksp_gateway_discovery_batch_size: int = Field(default=50, ge=1, le=200)
     ksp_gateway_picking_ids: list[int] = Field(default_factory=list)
     ksp_gateway_odoo_url: str | None = None
     ksp_gateway_odoo_database: str | None = None
