@@ -1,0 +1,20 @@
+services:
+  amazon_sync:
+    image: ${AMAZON_APP_IMAGE:-bokser_app_prod:latest}
+    entrypoint: ["python", "-m", "src.integrations.amazon_client.run"]
+    command: ["--demo"]
+    env_file:
+      - ${AMAZON_ENV_FILE:?Set AMAZON_ENV_FILE to the protected sandbox environment file}
+    networks: [amazon_db_net, amazon_connector_egress]
+    restart: "no"
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  amazon_db_net:
+    external: true
+    name: amazon_db_net
+  amazon_connector_egress: {}
