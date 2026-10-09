@@ -36,15 +36,16 @@ vendor SQL model was not found. No additional business tables or backend DB
 migration were introduced. Existing ingestion cursors, loaders, shared settings,
 worker schedule, transaction processing and lake manifests are unchanged.
 
-The new manual consumer accepts either a plain JSON list of complete source
+The manual Odoo import consumer accepts either a plain JSON list of complete source
 snapshots with explicit capture time, or the existing RawPayloadWriter envelope
 (metadata source_system=sos_inventory, entity_name=customer/vendor,
-written_at_utc with timezone, record_count, payload list). It does not fetch SOS
-or discover customer/vendor files automatically. A plain list must be a trusted
+written_at_utc with timezone, record_count, payload list). It does not discover
+files automatically. Separate opt-in capture now fetches customer/vendor snapshots;
+see [SOS_MASTER_CAPTURE.md](SOS_MASTER_CAPTURE.md). A plain list must be a trusted
 complete snapshot, not a partial update: missing optional contact fields become
 empty strings. Verify SOS account provenance of input before applying it.
-Use actual capture time, not replay time. Real customer/vendor fetching, API field
-coverage and independent incremental source checkpoints are next work.
+Use actual capture time, not replay time. Capture retains source revisions and its
+own success receipts. Full master parity and incremental cursors remain pending.
 
 ## Replays, updates and conflicts
 
@@ -136,11 +137,11 @@ For ORM validation run Odoo with -d bokser_sos_mirror_local -u bokser_sos_mirror
 Use -i instead of -u only for an initial install; -i on an already installed module
 does not rerun the suite. Check that eleven tests actually ran, not just exit code.
 
-Exact next step: confirm SOS customer/vendor API shapes, identity/version semantics
-and source account provenance, then implement safe opt-in master capture.
-Next implement opt-in customer/vendor capture using the existing SOSClient and
-RawPayloadWriter, with complete-page validation, source provenance and independent
-consumer progress; extend master fields/dependency mappings. Then add native draft
+Opt-in capture and read-only source verification are complete; see
+[SOS_MASTER_CAPTURE.md](SOS_MASTER_CAPTURE.md). Exact next step: resolve the 66
+customer parent dependencies and one alternate-number mapping, then extend master
+fields/source revision bindings. Keep customer imports blocked until mapped/tested.
+Then add native draft
 sales/purchase transactions with cutoff enforcement, products/UOM/currency/tax
 resolution and source-link dependencies. Plan remaining accounting/stock/returns
 adapters explicitly; draft native records may not represent historical posted

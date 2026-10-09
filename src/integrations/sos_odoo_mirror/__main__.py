@@ -9,12 +9,19 @@ from .contract import normalize, timestamp
 from .client import OdooMirrorClient, MirrorError
 
 
-def load_batch(path, entity, observed_at=None):
+def load_batch(path, entity, observed_at=None, expected_source_scope=None):
     raw = json.loads(Path(path).read_text(encoding="utf-8-sig"))
     if isinstance(raw, dict) and set(raw) == {"metadata", "payload"}:
         metadata = raw["metadata"]
         if not isinstance(metadata, dict) or metadata.get("source_system") != "sos_inventory" or metadata.get("entity_name") != entity:
             raise ValueError("invalid_lake_metadata")
+        if metadata.get("mirror_capture_version") is not None:
+            if metadata.get("mirror_capture_version") != 1 or metadata.get("pagination_checked") is not True:
+                raise ValueError("invalid_mirror_capture")
+            if expected_source_scope is not None and metadata.get("source_scope") != expected_source_scope:
+                raise ValueError("source_scope_mismatch")
+            if type(metadata.get("blocked_count")) is not int or metadata["blocked_count"] != 0:
+                raise ValueError("blocked_capture_requires_mapping_review")
         observed_at = metadata.get("written_at_utc")
         records = raw["payload"]
         if not isinstance(records, list) or type(metadata.get("record_count")) is not int or metadata["record_count"] != len(records):
@@ -32,7 +39,7 @@ def load_batch(path, entity, observed_at=None):
 
 async def run(args):
     # Validate every record before any network call; stop on the first server error.
-    batch = load_batch(args.file, args.entity, args.observed_at)
+    batch = load_batch(args.file, args.entity, args.observed_at, expected_source_scope=args.account if args.apply else None)
     if not args.apply:
         print(json.dumps({"mode": "dry_run", "entity": args.entity, "validated_records": len(batch)}))
         return
