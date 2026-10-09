@@ -24,6 +24,8 @@ from src.worker.jobs.process_data.sutton.process_sutton_reporting import (
     SuttonReportTasks,
 )
 
+# from backfill import export_acenda_catalog
+
 LAKE_ROOT = settings.lake_root
 
 
@@ -74,6 +76,8 @@ async def process_ship_sync_table():
 
 
 if __name__ == "__main__":
+
+    # asyncio.run(export_acenda_catalog())
 
     # asyncio.run(load_ship_sync_table())
     asyncio.run(process_ship_sync_table())

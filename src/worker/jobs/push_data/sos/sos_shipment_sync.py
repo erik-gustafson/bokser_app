@@ -510,13 +510,13 @@ class SosShipmentSyncTasks:
         self,
     ) -> list[SosShipmentSync]:
 
-        sync_delay = datetime.now(timezone.utc) - timedelta(minutes=15)
+        # sync_delay = datetime.now(timezone.utc) - timedelta(minutes=15)
 
         async with async_session() as session:
 
             stmt = select(SosShipmentSync).where(
                 SosShipmentSync.status == "pending",
-                SosShipmentSync.created_at <= sync_delay,
+                # SosShipmentSync.created_at <= sync_delay,
             )
 
             result = await session.scalars(stmt)
