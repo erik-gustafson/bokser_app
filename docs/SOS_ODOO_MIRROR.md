@@ -1,3 +1,5 @@
+Current checkpoint: see [Master fields and source revisions](SOS_MASTER_FIELDS_AND_REVISIONS.md) for wire schema 3, addon 19.0.0.3.0, current source blockers and validation. Earlier counts and limitations below are historical.
+
 # SOS to Odoo mirror
 
 Last verified locally: 2026-10-10. This is development source, not a deployed mirror.

@@ -4,10 +4,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 import re
 import sqlite3
-from .contract import digest, normalize
+from .contract import ADDRESS_FIELDS, CONTACT_FIELDS, digest, normalize, text_object, reference_id
 from src.storage.raw.writer import RawPayloadWriter
 
 SAFE_FIELDS = ("id", "syncToken", "name", "email", "website", "phone", "mobile", "archived", "summaryOnly")
+MASTER_SOURCE_FIELDS = ("companyName", "altPhone", "fax", "contact", "terms", "currency")
 API_BASE = "https://api.sosinventory.com/api/v2"
 
 
@@ -21,7 +22,7 @@ def source_scope(value):
     return value
 
 
-def project_record(record):
+def project_record(record, entity=None):
     if not isinstance(record, dict) or not set(SAFE_FIELDS) <= set(record):
         raise CaptureError("incomplete_master_record")
     if record["summaryOnly"] is not False or record["archived"] is not False:
@@ -31,6 +32,29 @@ def project_record(record):
     if any(record[k] is not None and not isinstance(record[k], str) for k in ("name", "email", "website", "phone", "mobile")):
         raise CaptureError("invalid_source_contact_type")
     safe = {key: record[key] for key in SAFE_FIELDS}
+    if entity is not None:
+        required = set(MASTER_SOURCE_FIELDS) | ({"billing", "shipping"} if entity == "customer" else {"address", "accountNumber"})
+        if not required <= set(record):
+            raise CaptureError("incomplete_master_record")
+        try:
+            for key in ("companyName", "altPhone", "fax") + (("accountNumber",) if entity == "vendor" else ()):
+                if record[key] is not None and not isinstance(record[key], str):
+                    raise ValueError("invalid_master_value")
+                safe[key] = record[key]
+            safe["contact"] = text_object(record["contact"], CONTACT_FIELDS)
+            for key in (("billing", "shipping") if entity == "customer" else ("address",)):
+                safe[key] = text_object(record[key], ADDRESS_FIELDS)
+            for key in ("terms", "currency"):
+                identifier = reference_id(record[key])
+                safe[key] = {"id": int(identifier)} if identifier is not None else None
+            # No source values from arbitrary custom fields or alternate-address
+            # bodies cross this allowlist. Count unresolved alternate identities.
+            alternate = record.get("altAddresses", [])
+            if not isinstance(alternate, list):
+                raise ValueError("invalid_alternate_addresses")
+            safe["altAddresses"] = [{"identity_unreviewed": True} for _ in alternate]
+        except ValueError as exc:
+            raise CaptureError(str(exc)) from None
     parent = record.get("parent")
     if parent is not None:
         if not isinstance(parent, dict) or type(parent.get("id")) is not int or parent["id"] <= 0:
@@ -39,7 +63,7 @@ def project_record(record):
     return safe
 
 
-def read_page(response, *, page_size, expected_count=None, expected_total=None):
+def read_page(response, *, page_size, expected_count=None, expected_total=None, entity=None):
     try:
         response.raise_for_status()
         body = response.json()
@@ -56,7 +80,7 @@ def read_page(response, *, page_size, expected_count=None, expected_total=None):
         raise CaptureError("source_changed_during_capture")
     if expected_count is not None and count != expected_count:
         raise CaptureError("incomplete_page")
-    return total, [project_record(record) for record in records]
+    return total, [project_record(record, entity) for record in records]
 
 
 async def fetch_master_records(client, entity, *, page_size=200, max_records=10000):
@@ -66,7 +90,7 @@ async def fetch_master_records(client, entity, *, page_size=200, max_records=100
     params = {"maxresults": page_size, "start": 1, "archived": "no"}
     try:
         response = await client.get("/" + entity, params=params)
-        total, first = read_page(response, page_size=page_size)
+        total, first = read_page(response, page_size=page_size, entity=entity)
         if total > max_records:
             raise CaptureError("capture_limit_exceeded")
         if len(first) != min(total, page_size):
@@ -74,7 +98,7 @@ async def fetch_master_records(client, entity, *, page_size=200, max_records=100
         records = list(first)
         for start in range(page_size + 1, total + 1, page_size):
             response = await client.get("/" + entity, params=dict(params, start=start))
-            _, page = read_page(response, page_size=page_size, expected_total=total,
+            _, page = read_page(response, page_size=page_size, expected_total=total, entity=entity,
                 expected_count=min(page_size, total - start + 1))
             records.extend(page)
         if len(records) != total or len({r["id"] for r in records}) != total:
@@ -82,7 +106,7 @@ async def fetch_master_records(client, entity, *, page_size=200, max_records=100
         # SOS exposes no atomic list snapshot. Detect count/first-page drift;
         # this cannot prove every page was immutable during the scan.
         response = await client.get("/" + entity, params=params)
-        _, check = read_page(response, page_size=page_size, expected_total=total,
+        _, check = read_page(response, page_size=page_size, expected_total=total, entity=entity,
             expected_count=len(first))
         if digest(check) != digest(first):
             raise CaptureError("source_changed_during_capture")

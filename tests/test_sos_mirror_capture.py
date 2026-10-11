@@ -12,6 +12,9 @@ from src.integrations.sos_odoo_mirror.__main__ import load_batch
 def record(identifier, **extra):
     return {"id": identifier, "syncToken": 0, "name": "Synthetic", "email": None,
         "website": None, "phone": None, "mobile": None, "archived": False,
+        "companyName": None, "altPhone": None, "fax": None, "contact": None,
+        "billing": None, "shipping": None, "address": None, "accountNumber": None,
+        "terms": None, "currency": None,
         "summaryOnly": False, **extra}
 
 

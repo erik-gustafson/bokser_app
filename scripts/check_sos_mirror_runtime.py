@@ -17,7 +17,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import httpx
 from src.integrations.sos_odoo_mirror.client import OdooMirrorClient
-from src.integrations.sos_odoo_mirror.contract import normalize
+from src.integrations.sos_odoo_mirror.contract import ADDRESS_FIELDS, CONTACT_FIELDS, normalize
 
 
 async def verify():
@@ -88,6 +88,57 @@ async def verify():
             "parent": {"id": source_id+7}}, start.isoformat())
         await blocked(missing, "parent_binding_missing")
         checks.append("missing_parent")
+        # The disposable owner provisions reviewed reference fixtures: SOS
+        # currency 42, terms 11, country US and state US|NY. No source names are
+        # used to adopt native partners or accounting reference records.
+        def master(token=10, name="Synthetic master", identifier=source_id+20):
+            address = dict.fromkeys(ADDRESS_FIELDS, "")
+            address.update(line1="Synthetic Street", line2="Suite 2", line3="Line 3",
+                line4="Line 4", line5="Line 5", city="Synthetic City", country="US", stateProvince="NY", postalCode="10001")
+            contact = dict.fromkeys(CONTACT_FIELDS, "")
+            contact.update(firstName="Synthetic", lastName="Person")
+            return normalize("customer", dict(id=identifier, name=name, syncToken=token,
+                companyName="Synthetic Company", altPhone="555-0102", fax="555-0103",
+                billing=address, shipping=dict(address, line1="Synthetic Delivery"), contact=contact,
+                currency={"id": 42}, terms={"id": 11}), start.isoformat())
+        p = master()
+        first = await send(p)
+        assert first["status"] == "created"
+        assert (await send(p))["status"] == "duplicate"
+        checks.append("master_create_replay")
+        read_url = client.url.split("/json/2/")[0] + "/json/2/res.partner/read"
+        rows = await http.post(read_url, headers=client.headers, json={"ids": [first["partner_id"]],
+            "fields": ["street", "street2", "bokser_sos_line3", "bokser_sos_line4", "bokser_sos_line5",
+                "property_payment_term_id", "bokser_sos_currency_id", "child_ids"]})
+        assert rows.status_code == 200
+        row = rows.json()[0]
+        assert [row[k] for k in ("street", "street2", "bokser_sos_line3", "bokser_sos_line4", "bokser_sos_line5")] == ["Synthetic Street", "Suite 2", "Line 3", "Line 4", "Line 5"]
+        assert row["property_payment_term_id"] and row["bokser_sos_currency_id"] and len(row["child_ids"]) == 2
+        checks.append("master_native_fields")
+        older = master(9, "Synthetic older source")
+        older["observed_at"] = (start + timedelta(days=2)).isoformat()
+        assert (await send(older))["status"] == "stale"
+        checks.append("source_revision_stale")
+        await blocked(master(10, "Synthetic same revision conflict"), "source_revision_conflict")
+        checks.append("source_revision_conflict")
+        newer = master(11, "Synthetic newer source")
+        newer["observed_at"] = (start - timedelta(days=1)).isoformat()
+        assert (await send(newer))["status"] == "updated"
+        assert (await send(master(12, "Synthetic newer source")))["status"] == "duplicate"
+        assert (await send(master(11, "Synthetic stale after duplicate")))["status"] == "stale"
+        checks.append("source_revision_advance")
+        child_rows = await http.post(read_url, headers=client.headers, json={"ids": row["child_ids"], "fields": ["type", "name", "street"]})
+        assert child_rows.status_code == 200
+        delivery = next(v for v in child_rows.json() if v["type"] == "delivery")
+        edit = await http.post(client.url.split("/json/2/")[0] + "/json/2/res.partner/write",
+            headers=client.headers, json={"ids": [delivery["id"]], "vals": {"street": "Synthetic local edit"}})
+        assert edit.status_code == 200
+        await blocked(master(13, "Synthetic newer source"), "local_edit_conflict")
+        checks.append("master_child_edit_conflict")
+        unresolved = master(identifier=source_id+21)
+        unresolved["master"]["currency_id"] = "999999999"
+        await blocked(unresolved, "master_reference_mapping_required:currency")
+        checks.append("master_reference_gate")
     print(json.dumps({"passed": checks}))
 
 

@@ -1,3 +1,5 @@
+Current checkpoint: see [Master fields and source revisions](SOS_MASTER_FIELDS_AND_REVISIONS.md) for wire schema 3, addon 19.0.0.3.0, current source blockers and validation. Earlier counts and limitations below are historical.
+
 # SOS master capture checkpoint — 2026-10-09
 
 Update 2026-10-10: the 67 historical customer mapping blockers below are resolved.

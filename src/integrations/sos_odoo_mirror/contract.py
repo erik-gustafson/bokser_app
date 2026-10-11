@@ -7,6 +7,40 @@ import json
 FIELDS = ("name", "email", "phone", "website")
 CURRENT_FIELDS = FIELDS + ("mobile",)
 ENTITIES = ("customer", "vendor")
+ADDRESS_FIELDS = ("line1", "line2", "line3", "line4", "line5", "city", "stateProvince", "postalCode", "country")
+CONTACT_FIELDS = ("title", "firstName", "middleName", "lastName", "suffix")
+MASTER_FIELDS = ("company_name", "alt_phone", "fax", "account_number", "contact", "primary", "shipping", "terms_id", "currency_id")
+
+
+def text_object(value, keys):
+    if value is None:
+        return {key: "" for key in keys}
+    if not isinstance(value, dict) or not set(keys) <= set(value):
+        raise ValueError("incomplete_master_fields")
+    result = {key: value[key] or "" for key in keys}
+    if any(value[key] is not None and not isinstance(value[key], str) for key in keys):
+        raise ValueError("invalid_master_value")
+    return result
+
+
+def reference_id(value):
+    if value is None:
+        return None
+    if not isinstance(value, dict) or type(value.get("id")) is not int or value["id"] <= 0:
+        raise ValueError("invalid_master_reference")
+    return str(value["id"])
+
+
+def payload_digest(payload, version=None):
+    version = payload["schema_version"] if version is None else version
+    values = {key: payload["values"][key] for key in (FIELDS if version == 1 else CURRENT_FIELDS)}
+    if version == 1:
+        return digest(values)
+    data = {"values": values, "parent_source_id": payload["parent_source_id"]}
+    if version >= 3:
+        data["master"] = payload["master"]
+    # Revision and observation are watermarks, not business values.
+    return digest(data)
 
 
 def timestamp(value):
@@ -30,11 +64,13 @@ def validate(payload):
     if not isinstance(payload, dict):
         raise ValueError("invalid_envelope")
     version = payload.get("schema_version")
-    if type(version) is not int or version not in (1, 2):
+    if type(version) is not int or version not in (1, 2, 3):
         raise ValueError("unsupported_schema")
     expected = {"schema_version", "entity", "source_id", "observed_at", "values"}
-    if version == 2:
+    if version >= 2:
         expected.add("parent_source_id")
+    if version >= 3:
+        expected.update(("master", "sync_token"))
     if set(payload) != expected:
         raise ValueError("invalid_envelope")
     if payload["entity"] not in ENTITIES:
@@ -50,12 +86,30 @@ def validate(payload):
         raise ValueError("invalid_partner_value")
     if not values["name"].strip():
         raise ValueError("name_required")
-    if version == 2:
+    if version >= 3:
+        token = payload["sync_token"]
+        if not isinstance(token, str) or not token.isascii() or not token.isdecimal() or len(token) > 64 or str(int(token)) != token:
+            raise ValueError("invalid_sync_token")
+        master = payload["master"]
+        if not isinstance(master, dict) or set(master) != set(MASTER_FIELDS):
+            raise ValueError("invalid_master_fields")
+        for key in ("terms_id", "currency_id"):
+            if master[key] is not None and not valid_identifier(master[key]):
+                raise ValueError("invalid_master_reference")
+        for key, keys in (("contact", CONTACT_FIELDS), ("primary", ADDRESS_FIELDS), ("shipping", ADDRESS_FIELDS)):
+            if not isinstance(master[key], dict) or set(master[key]) != set(keys):
+                raise ValueError("invalid_master_fields")
+        strings = [master[key] for key in ("company_name", "alt_phone", "fax", "account_number")]
+        strings += [v for key in ("contact", "primary", "shipping") for v in master[key].values()]
+        if any(not isinstance(v, str) or len(v) > 2048 or any(ord(c) < 32 and c not in "\t\r\n" for c in v) for v in strings):
+            raise ValueError("invalid_master_value")
+        if payload["entity"] == "vendor" and any(master["shipping"].values()):
+            raise ValueError("vendor_shipping_unsupported")
+    if version >= 2:
         parent = payload["parent_source_id"]
         if parent is not None and (not valid_identifier(parent) or parent == identifier or payload["entity"] != "customer"):
             raise ValueError("invalid_parent_reference")
-        return observed, digest({"values": values, "parent_source_id": parent})
-    return observed, digest(values)
+    return observed, payload_digest(payload)
 
 
 def valid_identifier(value):
@@ -66,6 +120,8 @@ def valid_identifier(value):
 def normalize(entity, record, observed_at):
     if not isinstance(record, dict):
         raise ValueError("invalid_source_record")
+    if record.get("summaryOnly") not in (None, False):
+        raise ValueError("summary_master_record_forbidden")
     if record.get("archived") not in (None, False):
         raise ValueError("archived_partner_pending")
     identifier = record.get("id")
@@ -87,6 +143,28 @@ def normalize(entity, record, observed_at):
     payload = {"schema_version": 2, "entity": entity, "source_id": str(identifier),
                "observed_at": observed_at, "values": values,
                "parent_source_id": str(parent) if parent is not None else None}
+    if "syncToken" in record:
+        required = {"contact", "terms", "currency", "companyName", "altPhone", "fax"}
+        required.update(("billing", "shipping") if entity == "customer" else ("address", "accountNumber"))
+        if not required <= set(record):
+            raise ValueError("incomplete_master_capture_recapture_required")
+        token = record["syncToken"]
+        if type(token) is not int or token < 0:
+            raise ValueError("invalid_sync_token")
+        # Alternate addresses have no documented immutable identity. Do not drop
+        # them or adopt native contacts by a mutable label.
+        if record.get("altAddresses"):
+            raise ValueError("alternate_address_identity_review_required")
+        for key in ("companyName", "altPhone", "fax", "accountNumber"):
+            if record.get(key) is not None and not isinstance(record[key], str):
+                raise ValueError("invalid_master_value")
+        payload.update(schema_version=3, sync_token=str(token), master={
+            "company_name": record["companyName"] or "", "alt_phone": record["altPhone"] or "",
+            "fax": record["fax"] or "", "account_number": record.get("accountNumber") or "",
+            "contact": text_object(record["contact"], CONTACT_FIELDS),
+            "primary": text_object(record["billing" if entity == "customer" else "address"], ADDRESS_FIELDS),
+            "shipping": text_object(record.get("shipping"), ADDRESS_FIELDS),
+            "terms_id": reference_id(record["terms"]), "currency_id": reference_id(record["currency"])})
     validate(payload)
     return payload
 
@@ -127,3 +205,13 @@ def replay_action(previous_time, previous_hash, observed, incoming_hash, target_
     if observed == previous_time:
         raise ValueError("observation_conflict")
     return "update"
+
+
+def revision_action(previous_token, incoming_token, previous_hash, incoming_hash, target_matches):
+    if not target_matches:
+        raise ValueError("local_edit_conflict")
+    if int(incoming_token) < int(previous_token):
+        return "stale"
+    if incoming_token == previous_token and incoming_hash != previous_hash:
+        raise ValueError("source_revision_conflict")
+    return "duplicate" if incoming_hash == previous_hash else "update"
