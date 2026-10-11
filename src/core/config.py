@@ -17,6 +17,7 @@ class Settings(
     BokserAPISettings,
     ShipmentProcessingSettings,
     KSPGatewaySettings,
+    SosMirrorSettings,
 ):
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),

@@ -10,6 +10,28 @@ ENTITIES = ("customer", "vendor")
 ADDRESS_FIELDS = ("line1", "line2", "line3", "line4", "line5", "city", "stateProvince", "postalCode", "country")
 CONTACT_FIELDS = ("title", "firstName", "middleName", "lastName", "suffix")
 MASTER_FIELDS = ("company_name", "alt_phone", "fax", "account_number", "contact", "primary", "shipping", "terms_id", "currency_id")
+ALTERNATE_FIELDS = ("company", "contact", "phone", "email", "addressName", "addressType")
+
+
+def alternate_addresses(value):
+    if value is None:
+        return []
+    if not isinstance(value, list) or len(value) > 1000:
+        raise ValueError("invalid_alternate_addresses")
+    result, seen = [], set()
+    for raw in value:
+        values = text_object(raw, ALTERNATE_FIELDS)
+        if not values["addressName"].strip() or not values["addressType"].strip():
+            raise ValueError("alternate_address_key_required")
+        # Names are source-owned keys, never native partner lookup keys. A
+        # rename creates a new owned role and archives the old role on replay.
+        key = digest([values["addressType"], values["addressName"]])
+        if key in seen:
+            raise ValueError("duplicate_alternate_address_key")
+        seen.add(key)
+        values.update(key=key, address=text_object(raw.get("address"), ADDRESS_FIELDS))
+        result.append(values)
+    return sorted(result, key=lambda r: r["key"])
 
 
 def text_object(value, keys):
@@ -38,7 +60,9 @@ def payload_digest(payload, version=None):
         return digest(values)
     data = {"values": values, "parent_source_id": payload["parent_source_id"]}
     if version >= 3:
-        data["master"] = payload["master"]
+        data["master"] = payload["master"] if version >= 4 else {key: payload["master"][key] for key in MASTER_FIELDS}
+    if version >= 4:
+        data["archived"] = payload["archived"]
     # Revision and observation are watermarks, not business values.
     return digest(data)
 
@@ -64,13 +88,17 @@ def validate(payload):
     if not isinstance(payload, dict):
         raise ValueError("invalid_envelope")
     version = payload.get("schema_version")
-    if type(version) is not int or version not in (1, 2, 3):
+    if type(version) is not int or version not in (1, 2, 3, 4):
         raise ValueError("unsupported_schema")
     expected = {"schema_version", "entity", "source_id", "observed_at", "values"}
     if version >= 2:
         expected.add("parent_source_id")
     if version >= 3:
         expected.update(("master", "sync_token"))
+    if version >= 4:
+        expected.add("archived")
+        if type(payload.get("archived")) is not bool:
+            raise ValueError("invalid_archived_flag")
     if set(payload) != expected:
         raise ValueError("invalid_envelope")
     if payload["entity"] not in ENTITIES:
@@ -91,7 +119,8 @@ def validate(payload):
         if not isinstance(token, str) or not token.isascii() or not token.isdecimal() or len(token) > 64 or str(int(token)) != token:
             raise ValueError("invalid_sync_token")
         master = payload["master"]
-        if not isinstance(master, dict) or set(master) != set(MASTER_FIELDS):
+        extra = {"alternates", "custom_fields"} if version >= 4 else set()
+        if not isinstance(master, dict) or set(master) != set(MASTER_FIELDS) | extra:
             raise ValueError("invalid_master_fields")
         for key in ("terms_id", "currency_id"):
             if master[key] is not None and not valid_identifier(master[key]):
@@ -101,6 +130,22 @@ def validate(payload):
                 raise ValueError("invalid_master_fields")
         strings = [master[key] for key in ("company_name", "alt_phone", "fax", "account_number")]
         strings += [v for key in ("contact", "primary", "shipping") for v in master[key].values()]
+        if version >= 4:
+            alternates = master["alternates"]
+            if not isinstance(alternates, list):
+                raise ValueError("invalid_alternate_addresses")
+            if any(not isinstance(a, dict) or set(a) != set(ALTERNATE_FIELDS) | {"key", "address"} for a in alternates):
+                raise ValueError("invalid_alternate_addresses")
+            if alternate_addresses(alternates) != alternates:
+                raise ValueError("invalid_alternate_address_identity")
+            for alternate in alternates:
+                strings += [alternate[k] for k in ALTERNATE_FIELDS] + list(alternate["address"].values())
+            custom = master["custom_fields"]
+            if not isinstance(custom, dict) or len(custom) > 1000 or any(not valid_identifier(k) for k in custom):
+                raise ValueError("invalid_custom_fields")
+            if any(v is not None and not isinstance(v, (str, bool, int, float)) for v in custom.values()):
+                raise ValueError("invalid_custom_field_value")
+            strings += [v for v in custom.values() if isinstance(v, str)]
         if any(not isinstance(v, str) or len(v) > 2048 or any(ord(c) < 32 and c not in "\t\r\n" for c in v) for v in strings):
             raise ValueError("invalid_master_value")
         if payload["entity"] == "vendor" and any(master["shipping"].values()):
@@ -122,7 +167,8 @@ def normalize(entity, record, observed_at):
         raise ValueError("invalid_source_record")
     if record.get("summaryOnly") not in (None, False):
         raise ValueError("summary_master_record_forbidden")
-    if record.get("archived") not in (None, False):
+    lifecycle = record.get("mirrorMasterVersion") == 4
+    if record.get("archived") not in (None, False) and not lifecycle:
         raise ValueError("archived_partner_pending")
     identifier = record.get("id")
     if type(identifier) is not int or identifier <= 0:
@@ -153,7 +199,7 @@ def normalize(entity, record, observed_at):
             raise ValueError("invalid_sync_token")
         # Alternate addresses have no documented immutable identity. Do not drop
         # them or adopt native contacts by a mutable label.
-        if record.get("altAddresses"):
+        if record.get("altAddresses") and not lifecycle:
             raise ValueError("alternate_address_identity_review_required")
         for key in ("companyName", "altPhone", "fax", "accountNumber"):
             if record.get(key) is not None and not isinstance(record[key], str):
@@ -165,6 +211,12 @@ def normalize(entity, record, observed_at):
             "primary": text_object(record["billing" if entity == "customer" else "address"], ADDRESS_FIELDS),
             "shipping": text_object(record.get("shipping"), ADDRESS_FIELDS),
             "terms_id": reference_id(record["terms"]), "currency_id": reference_id(record["currency"])})
+        if lifecycle:
+            if type(record.get("archived")) is not bool or not isinstance(record.get("approvedCustomFields"), dict):
+                raise ValueError("incomplete_lifecycle_capture")
+            payload.update(schema_version=4, archived=record["archived"])
+            payload["master"].update(alternates=alternate_addresses(record.get("altAddresses")),
+                custom_fields=record["approvedCustomFields"])
     validate(payload)
     return payload
 

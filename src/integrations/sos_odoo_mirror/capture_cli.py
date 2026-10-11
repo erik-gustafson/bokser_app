@@ -36,7 +36,8 @@ async def run(args):
         client.auth = ExistingDatabaseTokenAuth()
         for entity in (("customer", "vendor") if args.entity == "both" else (args.entity,)):
             result = await capture_master(client, entity=entity, scope=args.source_scope,
-                output_root=args.output_root, page_size=args.page_size, max_records=args.max_records)
+                output_root=args.output_root, page_size=args.page_size, max_records=args.max_records,
+                include_archived=args.include_archived, approved_fields=args.custom_field)
             print(json.dumps(result))
 
 
@@ -49,6 +50,8 @@ def main():
     parser.add_argument("--env-file", help="Optional existing private configuration; not copied or printed")
     parser.add_argument("--page-size", type=int, default=200)
     parser.add_argument("--max-records", type=int, default=10000)
+    parser.add_argument("--include-archived", action="store_true", help="Capture explicit archived source masters; never infer deletion from absence")
+    parser.add_argument("--custom-field", action="append", type=int, default=[], help="Owner-approved SOS custom field ID; repeat for each approved field")
     args = parser.parse_args()
     logging.disable(logging.CRITICAL)
     try:

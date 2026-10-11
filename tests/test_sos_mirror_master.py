@@ -60,15 +60,13 @@ class MasterTests(unittest.TestCase):
         r = master_record(); r["contact"] = dict(title="", firstName="Synthetic", middleName="",
             lastName="Person", suffix="", password="excluded")
         r["currency"] = {"id": 42, "name": "excluded"}
-        r["customFields"] = [{"value": "excluded"}]
+        r["customFields"] = [{"id": 1, "value": "excluded"}]
         safe = project_record(r, "customer")
         self.assertNotIn("excluded", str(safe))
         self.assertEqual(normalize("customer", safe, T)["master"]["currency_id"], "42")
         r["altAddresses"] = [{"portalPassword": "excluded"}]
-        safe = project_record(r, "customer")
-        self.assertNotIn("excluded", str(safe))
-        with self.assertRaisesRegex(ValueError, "identity_review"):
-            normalize("customer", safe, T)
+        with self.assertRaisesRegex(ValueError, "incomplete_master_fields"):
+            project_record(r, "customer")
 
     def test_master_source_whitespace_preserved_and_other_controls_rejected(self):
         r = master_record(); r["contact"] = dict(title="", firstName="Synthetic\tPerson",

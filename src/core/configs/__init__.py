@@ -10,6 +10,7 @@ from .amazon import AmazonSettings
 from .bokser_api import BokserAPISettings
 from .shipment_processing import ShipmentProcessingSettings
 from .ksp_gateway import KSPGatewaySettings
+from .sos_mirror import SosMirrorSettings
 
 __all__ = [
     "AppBaseSettings",
@@ -24,4 +25,5 @@ __all__ = [
     "BokserAPISettings",
     "ShipmentProcessingSettings",
     "KSPGatewaySettings",
+    "SosMirrorSettings",
 ]

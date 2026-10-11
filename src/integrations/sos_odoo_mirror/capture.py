@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import re
 import sqlite3
-from .contract import ADDRESS_FIELDS, CONTACT_FIELDS, digest, normalize, text_object, reference_id
+from .contract import ADDRESS_FIELDS, CONTACT_FIELDS, alternate_addresses, digest, normalize, text_object, reference_id
 from src.storage.raw.writer import RawPayloadWriter
 
 SAFE_FIELDS = ("id", "syncToken", "name", "email", "website", "phone", "mobile", "archived", "summaryOnly")
@@ -22,10 +22,10 @@ def source_scope(value):
     return value
 
 
-def project_record(record, entity=None):
+def project_record(record, entity=None, approved_fields=()):
     if not isinstance(record, dict) or not set(SAFE_FIELDS) <= set(record):
         raise CaptureError("incomplete_master_record")
-    if record["summaryOnly"] is not False or record["archived"] is not False:
+    if record["summaryOnly"] is not False or type(record["archived"]) is not bool:
         raise CaptureError("summary_or_archived_record")
     if type(record["id"]) is not int or record["id"] <= 0 or type(record["syncToken"]) is not int or record["syncToken"] < 0:
         raise CaptureError("invalid_source_identity_or_version")
@@ -47,12 +47,26 @@ def project_record(record, entity=None):
             for key in ("terms", "currency"):
                 identifier = reference_id(record[key])
                 safe[key] = {"id": int(identifier)} if identifier is not None else None
-            # No source values from arbitrary custom fields or alternate-address
-            # bodies cross this allowlist. Count unresolved alternate identities.
+            # Alternate bodies use a fixed address/contact allowlist; arbitrary
+            # custom fields never cross it without explicit owner approval.
             alternate = record.get("altAddresses", [])
             if not isinstance(alternate, list):
                 raise ValueError("invalid_alternate_addresses")
-            safe["altAddresses"] = [{"identity_unreviewed": True} for _ in alternate]
+            safe["altAddresses"] = alternate_addresses(alternate)
+            safe["approvedCustomFields"] = {}
+            fields = record.get("customFields") or []
+            if not isinstance(fields, list):
+                raise ValueError("invalid_custom_fields")
+            selected = {str(i) for i in approved_fields}
+            for field in fields:
+                if not isinstance(field, dict) or type(field.get("id")) is not int or field["id"] <= 0:
+                    raise ValueError("invalid_custom_fields")
+                key = str(field["id"])
+                if key in selected:
+                    if key in safe["approvedCustomFields"]:
+                        raise ValueError("duplicate_custom_field")
+                    safe["approvedCustomFields"][key] = field.get("value")
+            safe["mirrorMasterVersion"] = 4
         except ValueError as exc:
             raise CaptureError(str(exc)) from None
     parent = record.get("parent")
@@ -63,7 +77,7 @@ def project_record(record, entity=None):
     return safe
 
 
-def read_page(response, *, page_size, expected_count=None, expected_total=None, entity=None):
+def read_page(response, *, page_size, expected_count=None, expected_total=None, entity=None, approved_fields=()):
     try:
         response.raise_for_status()
         body = response.json()
@@ -80,17 +94,17 @@ def read_page(response, *, page_size, expected_count=None, expected_total=None, 
         raise CaptureError("source_changed_during_capture")
     if expected_count is not None and count != expected_count:
         raise CaptureError("incomplete_page")
-    return total, [project_record(record, entity) for record in records]
+    return total, [project_record(record, entity, approved_fields) for record in records]
 
 
-async def fetch_master_records(client, entity, *, page_size=200, max_records=10000):
+async def fetch_master_records(client, entity, *, page_size=200, max_records=10000, include_archived=False, approved_fields=()):
     if entity not in ("customer", "vendor") or type(page_size) is not int or not 1 <= page_size <= 200 or type(max_records) is not int or max_records <= 0:
         raise CaptureError("invalid_capture_options")
     # Even summary=no requests summary records: never include that parameter.
-    params = {"maxresults": page_size, "start": 1, "archived": "no"}
+    params = {"maxresults": page_size, "start": 1, "archived": "yes" if include_archived else "no"}
     try:
         response = await client.get("/" + entity, params=params)
-        total, first = read_page(response, page_size=page_size, entity=entity)
+        total, first = read_page(response, page_size=page_size, entity=entity, approved_fields=approved_fields)
         if total > max_records:
             raise CaptureError("capture_limit_exceeded")
         if len(first) != min(total, page_size):
@@ -98,7 +112,7 @@ async def fetch_master_records(client, entity, *, page_size=200, max_records=100
         records = list(first)
         for start in range(page_size + 1, total + 1, page_size):
             response = await client.get("/" + entity, params=dict(params, start=start))
-            _, page = read_page(response, page_size=page_size, expected_total=total, entity=entity,
+            _, page = read_page(response, page_size=page_size, expected_total=total, entity=entity, approved_fields=approved_fields,
                 expected_count=min(page_size, total - start + 1))
             records.extend(page)
         if len(records) != total or len({r["id"] for r in records}) != total:
@@ -106,7 +120,7 @@ async def fetch_master_records(client, entity, *, page_size=200, max_records=100
         # SOS exposes no atomic list snapshot. Detect count/first-page drift;
         # this cannot prove every page was immutable during the scan.
         response = await client.get("/" + entity, params=params)
-        _, check = read_page(response, page_size=page_size, expected_total=total, entity=entity,
+        _, check = read_page(response, page_size=page_size, expected_total=total, entity=entity, approved_fields=approved_fields,
             expected_count=len(first))
         if digest(check) != digest(first):
             raise CaptureError("source_changed_during_capture")
@@ -162,14 +176,15 @@ def publish_capture(writer, db, *, entity, scope, records, started_at, finished_
         "blocked_count": len(blocked), "file_path": str(result.file_path), "sha256": result.sha256}
 
 
-async def capture_master(client, *, entity, scope, output_root, page_size=200, max_records=10000):
+async def capture_master(client, *, entity, scope, output_root, page_size=200, max_records=10000, include_archived=False, approved_fields=()):
     source_scope(scope)
     root = Path(output_root)/scope
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
     journal = CaptureJournal(root)
     with journal.transaction() as db:
         started = datetime.now(timezone.utc).isoformat()
-        records = await fetch_master_records(client, entity, page_size=page_size, max_records=max_records)
+        records = await fetch_master_records(client, entity, page_size=page_size, max_records=max_records,
+            include_archived=include_archived, approved_fields=approved_fields)
         finished = datetime.now(timezone.utc).isoformat()
         return publish_capture(RawPayloadWriter(root), db, entity=entity, scope=scope,
             records=records, started_at=started, finished_at=finished)

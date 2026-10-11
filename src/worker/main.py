@@ -56,6 +56,15 @@ def build_runtime(http_client: httpx.AsyncClient) -> WorkerRuntime:
 
 def register_jobs(scheduler: AsyncIOScheduler, runtime: WorkerRuntime) -> None:
 
+    if settings.sos_mirror_job_enabled:
+        from src.worker.jobs.push_data.sos_odoo_mirror import build_sos_mirror_job
+        mirror_job = build_sos_mirror_job(settings)
+        scheduler.add_job(
+            mirror_job.tick, "interval", minutes=settings.sos_mirror_interval_minutes,
+            id="sos_odoo_mirror", max_instances=1, coalesce=True,
+            misfire_grace_time=60,
+        )
+
     if settings.ksp_gateway_job_enabled:
         from src.worker.jobs.push_data.odoo.ksp_gateway import build_ksp_gateway_job
         ksp_job = build_ksp_gateway_job(settings)
