@@ -13,6 +13,12 @@ MASTER_FIELDS = ("company_name", "alt_phone", "fax", "account_number", "contact"
 ALTERNATE_FIELDS = ("company", "contact", "phone", "email", "addressName", "addressType")
 
 
+def selected_custom_field_ids(entity, requested):
+    # Erik's reviewed copy decisions, 2026-10-10. Every other field is skipped.
+    allowed = {'customer': {'1'}, 'shipment': {'7'}}.get(entity, set())
+    return {str(identifier) for identifier in requested} & allowed
+
+
 def alternate_addresses(value):
     if value is None:
         return []

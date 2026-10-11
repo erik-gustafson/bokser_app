@@ -1,6 +1,6 @@
 # SOS inbound mirror — development checkpoint, 2026-10-10
 
-Erik (`erik@bokserhome.com`) is the source-account owner and designated owner of deployment, Odoo upgrades and shared migrations. The target Odoo database/company and approved custom-field IDs are still pending. The job is disabled by default; this checkpoint is not deployed or production-enabled.
+Erik (`erik@bokserhome.com`) is the source-account owner and designated owner of deployment, Odoo upgrades and shared migrations. The target Odoo database/company is still pending; custom fields 1 and 7 are approved as detailed below. The job is disabled by default; this checkpoint is not deployed or production-enabled.
 
 ## Scope and behavior
 
@@ -48,3 +48,11 @@ Merge the backend and addon feature branches as a coordinated pair. Preserve ori
 Erik must stop both the backend mirror job and Odoo mirror gate, wait for active runs to finish, then take a fresh Odoo database/filestore/addon backup and private journal snapshot as one quiesced checkpoint. Preserve backend private state and existing SOS loader cursors. Restore the paired code/database/filestore/journal checkpoint together. If newer journal acknowledgements survive an older Odoo restore, use `python -m src.integrations.sos_odoo_mirror.runner --replay-reviewed-all` only after owner review with delivery stopped; it resets acknowledgements while preserving immutable snapshots, hashes and target pin. Native idempotency/conflict gates still apply. Then run reconciliation and verify counts before re-enabling scheduling. Never delete/recreate native bindings or clear local-edit hashes to force a replay.
 
 Shared compatibility change: `addons/bokser_sales_fulfillment/models/stock.py` allows the `bokser_sos_` metadata namespace through its write guard. WMS fields continue to require fulfillment actions. Coordinate this file with the fulfillment session before merge/deployment.
+
+## Reviewed custom fields ? 2026-10-10
+
+Erik approved only IDs 1 and 7 and clarified that ?Ship? on IDs 11, 12 and 14 means Skip. All other inventory fields are skipped, including custom PO/Invoice Number strings 16/17. Capture filters IDs by entity before values cross the allowlist: customer 1, shipment 7, all others empty. Backend enabled-job settings and Odoo approvals reject skipped IDs. Gates remain disabled and configured approvals remain empty until the reviewed target is set up.
+
+ID 1 maps to the new native customer Char field `res.partner.bokser_sutton_customer_number`, label **Sutton Customer Number** (corrected spelling), preserving leading zeros, updates and clears, with local-edit detection. ID 7 maps to native `stock.picking.carrier_id` using an immutable reviewed reference (`kind=carrier`, `source_key=exact SOS field-7 text`, `carrier_id=reviewed delivery.carrier`). No fuzzy matching or carrier creation; missing mappings fail closed. Addon 19.0.0.5.0 depends on `stock_delivery`. No rating, label or shipping action runs on import. Returns/RMAs link native sales lines directly or through a uniquely linked invoice line; no identity is inferred from PO/Invoice Number custom text. Verify real source dependencies during rollout.
+
+Verification for this revision: 77 backend checks and 44 Odoo ORM runtime tests with fulfillment installed. The earlier 48 HTTPS scenarios are prior-checkpoint evidence, not a rerun for these new mapped fields. Existing 0.4 bindings have older native fingerprints; leave conflicts blocked and review a controlled migration/recapture before upgrading an existing mirrored dataset. This is still pre-production; do not clear fingerprints to force adoption. Target database/company, cutoff, real carrier mappings, pilot and production runtime verification remain pending.

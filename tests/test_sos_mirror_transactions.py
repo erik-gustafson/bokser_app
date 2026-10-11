@@ -54,9 +54,9 @@ class TransactionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'unsupported'):normalize_transaction('salesorder',r,T)
 
     def test_custom_fields_selected_before_wire_and_unknown_fields_rejected(self):
-        r=raw();r['customFields']=[{'id':1,'value':'Synthetic'},{'id':2,'value':'excluded'}]
-        p=normalize_transaction('salesorder',r,T,approved_fields=[1])
-        self.assertEqual(p['custom_fields'],{'1':'Synthetic'});self.assertNotIn('excluded',str(p))
+        r=raw('shipment');r['customFields']=[{'id':7,'value':'Synthetic'},{'id':2,'value':'excluded'}]
+        p=normalize_transaction('shipment',r,T,approved_fields=[7])
+        self.assertEqual(p['custom_fields'],{'7':'Synthetic'});self.assertNotIn('excluded',str(p))
         p['password']='excluded'
         with self.assertRaises(ValueError):validate_transaction(p)
 

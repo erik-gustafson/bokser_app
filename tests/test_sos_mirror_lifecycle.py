@@ -13,6 +13,16 @@ def alternate(name="Secondary", kind="Shipping"):
 
 
 class LifecycleTests(unittest.TestCase):
+    def test_owner_skips_and_entity_scope_filter_values_before_capture(self):
+        from src.integrations.sos_odoo_mirror.contract import selected_custom_field_ids
+        requested=[1,5,7,8,9,10,11,12,13,14,16,17,18,19,20,24]
+        r=master_record();r['customFields']=[{'id':i,'value':'00123' if i==1 else 'excluded'} for i in requested]
+        safe=project_record(r,'customer',approved_fields=requested)
+        self.assertEqual(safe['approvedCustomFields'],{'1':'00123'})
+        self.assertNotIn('excluded',str(safe))
+        self.assertEqual(selected_custom_field_ids('shipment',requested),{'7'})
+        for entity in ('vendor','salesorder','return','rma'):
+            self.assertEqual(selected_custom_field_ids(entity,requested),set())
     def test_alternates_are_order_independent_and_scoped_source_keys(self):
         r = master_record(); r["altAddresses"] = [alternate(), alternate("Invoice", "Billing")]
         p = normalize("customer", project_record(r, "customer"), T)

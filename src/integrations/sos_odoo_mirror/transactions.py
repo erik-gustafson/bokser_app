@@ -1,7 +1,7 @@
 """Allowlisted SOS transaction snapshots; shared verbatim with the Odoo addon."""
 from datetime import date
 from decimal import Decimal, InvalidOperation
-from .contract import ADDRESS_FIELDS, ALTERNATE_FIELDS, digest, reference_id, text_object, timestamp, valid_identifier
+from .contract import ADDRESS_FIELDS, ALTERNATE_FIELDS, digest, reference_id, text_object, timestamp, valid_identifier, selected_custom_field_ids
 
 ENTITIES = ('purchaseorder', 'itemreceipt', 'estimate', 'salesorder', 'invoice',
             'salesreceipt', 'payment', 'return', 'rma', 'shipment')
@@ -111,7 +111,7 @@ def normalize_transaction(entity, record, observed_at, approved_fields=()):
             if type(record[k]) is not bool: raise ValueError('invalid_transaction_flag')
             facts[k] = record[k]
     facts.update({k:text_value(record[k]) for k in TEXT_FACTS if k in record})
-    custom, approved = {}, {str(k) for k in approved_fields}
+    custom, approved = {}, selected_custom_field_ids(entity, approved_fields)
     for field in record.get('customFields') or []:
         if not isinstance(field, dict) or type(field.get('id')) is not int or field['id'] <= 0:
             raise ValueError('invalid_custom_fields')

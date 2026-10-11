@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import re
 import sqlite3
-from .contract import ADDRESS_FIELDS, CONTACT_FIELDS, alternate_addresses, digest, normalize, text_object, reference_id
+from .contract import ADDRESS_FIELDS, CONTACT_FIELDS, alternate_addresses, digest, normalize, text_object, reference_id, selected_custom_field_ids
 from src.storage.raw.writer import RawPayloadWriter
 
 SAFE_FIELDS = ("id", "syncToken", "name", "email", "website", "phone", "mobile", "archived", "summaryOnly")
@@ -57,7 +57,7 @@ def project_record(record, entity=None, approved_fields=()):
             fields = record.get("customFields") or []
             if not isinstance(fields, list):
                 raise ValueError("invalid_custom_fields")
-            selected = {str(i) for i in approved_fields}
+            selected = selected_custom_field_ids(entity, approved_fields)
             for field in fields:
                 if not isinstance(field, dict) or type(field.get("id")) is not int or field["id"] <= 0:
                     raise ValueError("invalid_custom_fields")

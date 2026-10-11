@@ -1,4 +1,4 @@
-Current checkpoint: [Transactions, lifecycle and automation](SOS_TRANSACTIONS_AND_AUTOMATION.md), addon 19.0.0.4.0. Erik owns shared operations; target/company/custom approvals are pending. The older checkpoints below are historical.
+Current checkpoint: [Transactions, lifecycle and automation](SOS_TRANSACTIONS_AND_AUTOMATION.md), addon 19.0.0.5.0. Erik owns shared operations; target/company is pending; only custom IDs 1 and 7 are approved. The older checkpoints below are historical.
 
 Current checkpoint: see [Master fields and source revisions](SOS_MASTER_FIELDS_AND_REVISIONS.md) for wire schema 3, addon 19.0.0.3.0, current source blockers and validation. Earlier counts and limitations below are historical.
 

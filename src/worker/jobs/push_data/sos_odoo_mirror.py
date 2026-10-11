@@ -21,6 +21,8 @@ class SosMirrorJob:
             raise ValueError('mirror_target_configuration_required')
         if any(type(i) is not int or i<=0 for i in settings.sos_mirror_custom_field_ids) or len(set(settings.sos_mirror_custom_field_ids))!=len(settings.sos_mirror_custom_field_ids):
             raise ValueError('invalid_custom_field_approval')
+        if not set(settings.sos_mirror_custom_field_ids)<={1,7}:
+            raise ValueError('custom_field_not_owner_approved')
         self.settings=settings
         self.journal=DeliveryJournal(settings.sos_mirror_journal_root,{
             'url':settings.sos_mirror_odoo_url,'database':settings.sos_mirror_odoo_database,
