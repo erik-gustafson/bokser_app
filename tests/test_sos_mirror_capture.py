@@ -130,13 +130,12 @@ class CaptureTests(unittest.IsolatedAsyncioTestCase):
             with closing(sqlite3.connect(Path(directory)/"test/_mirror_capture/captures.sqlite3")) as db:
                 self.assertEqual(db.execute("SELECT record_count FROM captures").fetchone()[0], 1)
 
-    async def test_blocked_records_captured_but_import_fails_closed(self):
+    async def test_hierarchy_and_dual_phone_capture_revalidate_successfully(self):
         response = page([record(1), record(2, parent={"id": 1}), record(3, phone="a", mobile="b")])
         with tempfile.TemporaryDirectory() as directory:
             result = await capture_master(FakeClient([response, response]), entity="customer", scope="test", output_root=directory)
-            self.assertEqual((result["ready_count"], result["blocked_count"]), (1, 2))
-            with self.assertRaisesRegex(ValueError, "blocked_capture_requires_mapping_review"):
-                load_batch(result["file_path"], "customer", expected_source_scope="test")
+            self.assertEqual((result["ready_count"], result["blocked_count"]), (3, 0))
+            self.assertEqual(len(load_batch(result["file_path"], "customer", expected_source_scope="test")), 3)
 
 
 if __name__ == "__main__":

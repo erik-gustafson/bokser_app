@@ -1,6 +1,6 @@
-# SOS to Odoo mirror: first development increment
+# SOS to Odoo mirror
 
-Last verified locally: 2026-10-09. This is development source, not a deployed mirror.
+Last verified locally: 2026-10-10. This is development source, not a deployed mirror.
 Re-read live Git refs, other worktrees and NAS deployment state before merging or operating.
 
 ## Scope and decisions
@@ -12,17 +12,18 @@ records without triggering extra business functionality. Before cutover only
 SOS to Odoo is allowed, except separately authorized SOS push tests.
 Historical transaction cutoff and direction are system parameters.
 
-This increment implements complete, non-hierarchical, non-archived customer/vendor
-contact snapshots into native `res.partner` only. Its binding is unique by
+This increment implements complete, non-archived customer/vendor contact snapshots,
+including customer parent dependencies and separate mobile numbers,
+into native `res.partner` only. Its binding is unique by
 (account, entity, SOS ID); account identity/company cannot be changed after creation.
 Name/email matching is deliberately not an identity rule. A customer and vendor
 with the same numeric ID have separate bindings and separate partners.
 Adoption/deduplication of existing Odoo partners needs a reviewed mapping before use
 on a real dataset. It currently creates new partners; it does not adopt existing ones.
-Only name, email, phone and website transfer. Odoo 19 has no native mobile field;
-a mobile-only source number maps to phone. Two distinct phone/mobile numbers
-fail with multiple_phone_numbers_pending until an alternate-number mapping is reviewed. Customer/vendor rank and
-company are set by the server. Addresses, terms, currencies, hierarchy, archival,
+Name, email, phone, website, mobile and parent source identity transfer. Odoo 19
+has no native mobile field; SOS Mobile is an additive native partner field.
+A mobile-only number also falls back to phone. Customer/vendor rank and
+company are set by the server. Addresses, terms, currencies, archival,
 custom fields and complete master parity remain pending. Raw JSON, notes, portal
 passwords and payment credentials are excluded by an explicit field allowlist.
 
@@ -69,7 +70,7 @@ accounting posting or warehouse submission exists in this increment.
 
 ## Configuration and execution
 
-The Odoo addon is `addons/bokser_sos_mirror`, version 19.0.0.1.0; it depends on
+The Odoo addon is `addons/bokser_sos_mirror`, version 19.0.0.2.0; it depends on
 account and rpc. Installation creates new Odoo tables; therefore installation/
 upgrade is a shared database operation and needs the sole designated operations
 owner. No owner is designated now and no shared database changes were performed.
@@ -137,10 +138,12 @@ For ORM validation run Odoo with -d bokser_sos_mirror_local -u bokser_sos_mirror
 Use -i instead of -u only for an initial install; -i on an already installed module
 does not rerun the suite. Check that eleven tests actually ran, not just exit code.
 
-Opt-in capture and read-only source verification are complete; see
-[SOS_MASTER_CAPTURE.md](SOS_MASTER_CAPTURE.md). Exact next step: resolve the 66
-customer parent dependencies and one alternate-number mapping, then extend master
-fields/source revision bindings. Keep customer imports blocked until mapped/tested.
+Opt-in capture, read-only source verification and the 67 customer dependency/phone
+blockers are resolved; see [SOS_MASTER_CAPTURE.md](SOS_MASTER_CAPTURE.md) and
+[SOS_PARTNER_MAPPING.md](SOS_PARTNER_MAPPING.md). Current verification is 31 backend
+tests, 18 disposable Odoo ORM tests, and 13 real synthetic HTTPS scenarios.
+Exact next step: extend master fields/source revision bindings. Production imports
+remain disabled pending reviewed company/source mapping, upgrades and activation.
 Then add native draft
 sales/purchase transactions with cutoff enforcement, products/UOM/currency/tax
 resolution and source-link dependencies. Plan remaining accounting/stock/returns

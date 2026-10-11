@@ -18,12 +18,12 @@ class ContractTests(unittest.TestCase):
         self.assertNotIn("excluded", json.dumps(p))
         self.assertEqual(p["source_id"], "1")
 
-    def test_mobile_only_maps_to_native_phone_and_dual_numbers_block(self):
+    def test_mobile_only_and_dual_numbers_preserved(self):
         payload = normalize("customer", {"id": 1, "name": "X", "mobile": "555-0100"}, T)
         self.assertEqual(payload["values"]["phone"], "555-0100")
-        self.assertNotIn("mobile", payload["values"])
-        with self.assertRaisesRegex(ValueError, "multiple_phone_numbers_pending"):
-            normalize("customer", {"id": 1, "name": "X", "phone": "555-0100", "mobile": "555-0101"}, T)
+        self.assertEqual(payload["values"]["mobile"], "555-0100")
+        dual = normalize("customer", {"id": 1, "name": "X", "phone": "555-0100", "mobile": "555-0101"}, T)
+        self.assertEqual((dual["values"]["phone"], dual["values"]["mobile"]), ("555-0100", "555-0101"))
 
     def test_id_and_value_validation(self):
         for identifier in (True, "1", 0, -1):
@@ -33,8 +33,9 @@ class ContractTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 normalize("customer", {"id": 1, "name": "X", "phone": value}, T)
 
-    def test_hierarchy_and_archived_rejected(self):
-        for extra in ({"parent": {"id": 2}}, {"archived": True}):
+    def test_parent_reference_retained_and_archived_rejected(self):
+        self.assertEqual(normalize("customer", {"id": 1, "name": "X", "parent": {"id": 2}}, T)["parent_source_id"], "2")
+        for extra in ({"parent": {"id": 1}}, {"archived": True}):
             with self.assertRaises(ValueError):
                 normalize("customer", {"id": 1, "name": "X", **extra}, T)
 

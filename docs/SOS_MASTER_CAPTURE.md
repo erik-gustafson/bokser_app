@@ -1,5 +1,10 @@
 # SOS master capture checkpoint — 2026-10-09
 
+Update 2026-10-10: the 67 historical customer mapping blockers below are resolved.
+Both original batches validate with zero blockers under wire schema 2; see
+[SOS_PARTNER_MAPPING.md](SOS_PARTNER_MAPPING.md). The counts below remain the original
+capture-time assessment; files/checksums are preserved. No live Odoo import occurred.
+
 Verify current repositories, source connection and deployment state before continuing.
 This is opt-in capture development. Production Odoo delivery/scheduling remains disabled.
 
@@ -52,7 +57,8 @@ cursors, DataLakeFile claims/status, token tables and worker scheduling are unto
 Failed pages produce no file/success receipt for that entity. Rerun performs a full scan.
 A journal failure after publication leaves an orphan file: verify/checksum it or rerun.
 With --entity both, a completed customer receipt remains valid if vendor then fails.
-Customer batches containing blocked records cannot import successfully; no silent skips.
+Every customer batch is revalidated with the current mapper before import; historical
+blocked counts never authorize skipping records or bypass dependency validation.
 
 syncToken is documented as a record version and retained verbatim; monotonic ordering
 is not assumed. updatedsince is documented without timezone; lastSync concerns
@@ -77,9 +83,8 @@ these private. Schema-only evidence is sos_master_probe_20261009.json in the bas
 folder; local convenience harness run_sos_master_capture_readonly.py is also there.
 The committed CLI is the supported entry point; do not publish contact-data bundles.
 
-Exact next step: implement/test parent-first native partner mapping for 66 customers,
-and alternate-number mapping for the dual-phone customer. Then extend addresses/
-contacts/terms/currency and source revision bindings before transactions. Customer
-imports stay blocked. No shared deployment/upgrade/database migration owner is
+Parent-first and alternate-number mappings now pass local/ORM/HTTPS verification.
+Next extend addresses/contacts/terms/currency and source revision bindings before
+transactions. Production imports remain disabled. No shared deployment/upgrade/database migration owner is
 designated. Those operations have one owner at a time. Use separate feature worktrees,
 preserve other sessions and coordinate shared model/config/security/migration changes.

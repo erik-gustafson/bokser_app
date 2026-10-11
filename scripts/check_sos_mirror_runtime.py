@@ -68,6 +68,26 @@ async def verify():
         assert sorted(v["status"] for v in concurrent) == ["created", "duplicate"]
         assert concurrent[0]["partner_id"] == concurrent[1]["partner_id"]
         checks.append("concurrent_replay")
+        parent_payload = normalize("customer", {"id": source_id+4, "name": "Synthetic parent",
+            "phone": "555-0100", "mobile": "555-0101"}, start.isoformat())
+        root = await send(parent_payload)
+        child_payload = normalize("customer", {"id": source_id+5, "name": "Synthetic child",
+            "parent": {"id": source_id+4}}, start.isoformat())
+        child = await send(child_payload)
+        rows = await http.post(client.url.split("/json/2/")[0] + "/json/2/res.partner/read",
+            headers=client.headers, json={"ids": [root["partner_id"], child["partner_id"]],
+                "fields": ["parent_id", "phone", "bokser_sos_mobile"]})
+        assert rows.status_code == 200
+        by_id = {row["id"]: row for row in rows.json()}
+        assert (by_id[root["partner_id"]]["phone"], by_id[root["partner_id"]]["bokser_sos_mobile"]) == ("555-0100", "555-0101")
+        assert by_id[child["partner_id"]]["parent_id"][0] == root["partner_id"]
+        checks.extend(["dual_phone", "parent_child"])
+        assert (await send(child_payload))["status"] == "duplicate"
+        checks.append("child_replay")
+        missing = normalize("customer", {"id": source_id+6, "name": "Synthetic orphan",
+            "parent": {"id": source_id+7}}, start.isoformat())
+        await blocked(missing, "parent_binding_missing")
+        checks.append("missing_parent")
     print(json.dumps({"passed": checks}))
 
 

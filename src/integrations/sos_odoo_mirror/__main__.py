@@ -5,7 +5,7 @@ import json
 import os
 from pathlib import Path
 import httpx
-from .contract import normalize, timestamp
+from .contract import normalize, order_batch, timestamp
 from .client import OdooMirrorClient, MirrorError
 
 
@@ -20,8 +20,8 @@ def load_batch(path, entity, observed_at=None, expected_source_scope=None):
                 raise ValueError("invalid_mirror_capture")
             if expected_source_scope is not None and metadata.get("source_scope") != expected_source_scope:
                 raise ValueError("source_scope_mismatch")
-            if type(metadata.get("blocked_count")) is not int or metadata["blocked_count"] != 0:
-                raise ValueError("blocked_capture_requires_mapping_review")
+            # Historical readiness counts belong to the mapper at capture time.
+            # Revalidate every record and the entire graph with today's mapper.
         observed_at = metadata.get("written_at_utc")
         records = raw["payload"]
         if not isinstance(records, list) or type(metadata.get("record_count")) is not int or metadata["record_count"] != len(records):
@@ -34,7 +34,7 @@ def load_batch(path, entity, observed_at=None, expected_source_scope=None):
     batch = [normalize(entity, record, observed_at) for record in records]
     if len({p["source_id"] for p in batch}) != len(batch):
         raise ValueError("duplicate_source_id_in_batch")
-    return batch
+    return order_batch(batch)
 
 
 async def run(args):
