@@ -99,3 +99,36 @@ class DeliveryTests(unittest.TestCase):
         self.journal.finish(claim[0],claim[1],{'status':'created','res_id':123})
         self.assertEqual(self.journal.replay_reviewed_all(),1)
         self.assertEqual(self.journal.claim()[2],self.payload)
+
+    def test_backfill_requeues_only_latest_exclusions_in_selected_date_scope(self):
+        p=copy.deepcopy(self.payload);p['transaction_date']='2025-06-01'
+        q=copy.deepcopy(p);q['sync_token']='2'
+        older=copy.deepcopy(p);older['source_id']='19';older['transaction_date']='2024-01-01'
+        for item in (p,q,older):
+            self.journal.stage([item]);claim=self.journal.claim()
+            self.journal.finish(claim[0],claim[1],{'status':'before_cutoff','res_id':None})
+        current=copy.deepcopy(self.payload);current['source_id']='20'
+        self.journal.stage([current]);claim=self.journal.claim()
+        self.journal.finish(claim[0],claim[1],{'status':'created','res_id':123})
+        self.assertEqual(self.journal.requeue_cutoff_exclusions('2025-01-01'),1)
+        claim=self.journal.claim()
+        self.assertEqual(claim[2]['sync_token'],'2');self.assertEqual(claim[2]['transaction_date'],'2025-06-01')
+
+    def test_backfill_requires_stopped_runs_and_canonical_date(self):
+        owner=self.journal.acquire_run()
+        with self.assertRaisesRegex(ValueError,'requires_stopped'):
+            self.journal.requeue_cutoff_exclusions('2025-01-01')
+        self.journal.release_run(owner)
+        for value in ('20250101','bad','2025-02-30'):
+            with self.assertRaises(ValueError):self.journal.requeue_cutoff_exclusions(value)
+
+    def test_transport_accepts_stale_exclusion_without_native_record(self):
+        import httpx
+        from src.integrations.sos_odoo_mirror.client import OdooMirrorClient
+        async def run():
+            transport=httpx.MockTransport(lambda request:httpx.Response(200,json={
+                'status':'stale','entity':'salesorder','source_id':'17','res_id':None}))
+            async with httpx.AsyncClient(transport=transport) as http:
+                client=OdooMirrorClient(base_url=TARGET['url'],database='synthetic',api_key='synthetic-test-key',client=http)
+                return await client.import_transaction(account_code='synthetic',company_id=1,payload=self.payload)
+        self.assertEqual(asyncio.run(run())['status'],'stale')

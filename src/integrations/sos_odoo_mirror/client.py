@@ -38,6 +38,8 @@ class OdooMirrorClient:
             raise MirrorError('invalid_odoo_response')
         if result['status']=='before_cutoff':
             if result['res_id'] is not None:raise MirrorError('invalid_odoo_response')
+        elif result['status']=='stale' and result['res_id'] is None:
+            pass  # A newer cutoff-exclusion receipt owns this source identity.
         elif type(result['res_id']) is not int or result['res_id']<=0:raise MirrorError('invalid_odoo_response')
         return result
 

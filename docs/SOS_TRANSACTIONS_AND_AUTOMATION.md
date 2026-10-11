@@ -1,6 +1,6 @@
 # SOS inbound mirror — development checkpoint, 2026-10-10
 
-Erik (`erik@bokserhome.com`) is the source-account owner and designated owner of deployment, Odoo upgrades and shared migrations. The target Odoo database/company is still pending; custom fields 1 and 7 are approved as detailed below. The job is disabled by default; this checkpoint is not deployed or production-enabled.
+Erik (`erik@bokserhome.com`) is the source-account owner and designated owner of deployment, Odoo upgrades and shared migrations. The target database bokser_test and first-pass cutoff 2026-01-01 are confirmed; Bokser Home/company 2 is proposed pending confirmation. Custom fields 1 and 7 are approved as detailed below. The job is disabled by default; this checkpoint is not deployed or production-enabled.
 
 ## Scope and behavior
 
@@ -56,3 +56,20 @@ Erik approved only IDs 1 and 7 and clarified that ?Ship? on IDs 11, 12 and 14 me
 ID 1 maps to the new native customer Char field `res.partner.bokser_sutton_customer_number`, label **Sutton Customer Number** (corrected spelling), preserving leading zeros, updates and clears, with local-edit detection. ID 7 maps to native `stock.picking.carrier_id` using an immutable reviewed reference (`kind=carrier`, `source_key=exact SOS field-7 text`, `carrier_id=reviewed delivery.carrier`). No fuzzy matching or carrier creation; missing mappings fail closed. Addon 19.0.0.5.0 depends on `stock_delivery`. No rating, label or shipping action runs on import. Returns/RMAs link native sales lines directly or through a uniquely linked invoice line; no identity is inferred from PO/Invoice Number custom text. Verify real source dependencies during rollout.
 
 Verification for this revision: 77 backend checks and 44 Odoo ORM runtime tests with fulfillment installed. The earlier 48 HTTPS scenarios are prior-checkpoint evidence, not a rerun for these new mapped fields. Existing 0.4 bindings have older native fingerprints; leave conflicts blocked and review a controlled migration/recapture before upgrading an existing mirrored dataset. This is still pre-production; do not clear fingerprints to force adoption. Target database/company, cutoff, real carrier mappings, pilot and production runtime verification remain pending.
+
+## Confirmed first-pass scope and production backfill ? 2026-10-10
+
+Erik confirmed database `bokser_test` and SOS year-to-date transactions for the first pass: business-date cutoff **2026-01-01**. All customer/vendor masters remain in scope, including older masters needed by YTD transactions. Prepare for Bokser Home (company 2); live database also has My Company (company 1), so company selection is proposed pending Erik's confirmation. Read-only target preflight verified the mirror addon is not installed and inventoried 26 active products, 2 warehouses and 7 journals for company 2/shared products; counts do not prove source mappings are complete. No production settings were changed.
+
+The disabled backend configuration draft is `docker/sos-mirror.env.example` (backend repo). Configure credentials and CA only in private settings. Reviewed source account code is `bokser-sos-prod`; verify its relationship to the stored SOS token before enabling. Set the Odoo transaction cutoff to 2026-01-01 during owner setup. This is a first-pass lower bound, not an automatic annual reset.
+
+Older transactions retain durable cutoff exclusion receipts without native business records. Production backfill expands the earliest date explicitly; it does not delete/replace existing YTD records. Owner procedure: stop the mirror worker job, wait for active leases/runs to finish, take a fresh paired database/filestore/journal backup, lower the Odoo cutoff to the approved earlier ISO date, and requeue the latest eligible historical exclusion receipts:
+
+```
+python -m src.integrations.sos_odoo_mirror.runner --requeue-cutoff-exclusions-from 2025-01-01
+python -m src.integrations.sos_odoo_mirror.runner --run --reconcile
+```
+
+The date above is an example, not approved history scope. Keep the expanded cutoff to allow ongoing updates to backfilled records. Requeue selects only the latest recorded source revision per identity, dates at/after the chosen boundary, and completed cutoff-exclusion receipts. Existing native acknowledgements remain intact. Full reconciliation captures records not in the old journal and newer source revisions. Odoo rejects equal-version conflicts and acknowledges obsolete exclusion revisions as stale with no native ID, then creates only the current eligible source revision. Continue reviewed runs until delivery is complete, reconcile native/source counts and totals, confirm draft/no stock/accounting/WMS effects, then re-enable scheduling. Do not use whole-journal restore replay for routine historical backfill.
+
+Current code verification: 80 backend checks; 45 disposable Odoo ORM runtime tests with fulfillment installed, including stale/conflicting backfill revisions and single native creation. Addon 19.0.0.5.1; no backend Alembic migration. Production import/backfill and scheduler verification remain pending.

@@ -162,6 +162,23 @@ class DeliveryJournal(CaptureJournal):
                 raise ValueError('mirror_recovery_requires_stopped_delivery')
             return db.execute("UPDATE deliveries SET state='pending',attempts=0,next_attempt=0,lease_until=0,owner=NULL,error_code=NULL,native_id=NULL,result=NULL").rowcount
 
+    def requeue_cutoff_exclusions(self, from_date):
+        from datetime import date
+        if not isinstance(from_date,str) or date.fromisoformat(from_date).isoformat()!=from_date:
+            raise ValueError('invalid_backfill_date')
+        with self.transaction() as db:
+            now=time.time()
+            if db.execute("SELECT 1 FROM deliveries WHERE state='leased' AND lease_until>? LIMIT 1",(now,)).fetchone() or db.execute('SELECT 1 FROM mirror_run_lease WHERE expires_at>? LIMIT 1',(now,)).fetchone():
+                raise ValueError('mirror_backfill_requires_stopped_delivery')
+            latest={}
+            for row in db.execute("SELECT id,entity,source_id,sync_token,state,result,payload FROM deliveries WHERE entity NOT IN ('customer','vendor')"):
+                key=(row[1],row[2])
+                if key not in latest or int(row[3])>int(latest[key][3]):latest[key]=row
+            selected=[row[0] for row in latest.values() if row[4]=='done' and row[5]=='before_cutoff' and json.loads(row[6])['transaction_date']>=from_date]
+            for identifier in selected:
+                db.execute("UPDATE deliveries SET state='pending',attempts=0,next_attempt=0,lease_until=0,owner=NULL,error_code=NULL,native_id=NULL,result=NULL WHERE id=?",(identifier,))
+            return len(selected)
+
     def summary(self):
         with closing(sqlite3.connect(self.path)) as db:
             states=dict(db.execute('SELECT state,COUNT(*) FROM deliveries GROUP BY state').fetchall())
